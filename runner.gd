@@ -3,8 +3,8 @@ extends SceneTree
 const EXIT_OK := 0
 const EXIT_FAIL := 1
 const EXIT_USAGE := 2
-const GodoteerDriver = preload("res://addons/godoteer_gd/driver.gd")
-const GodoteerTestCase = preload("res://addons/godoteer_gd/test_case.gd")
+const GodoteerDriver = preload("driver.gd")
+const GodoteerTestCase = preload("test_case.gd")
 
 
 func _initialize() -> void:
@@ -88,7 +88,7 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 
 
 func _usage_text() -> String:
-	return "Usage: godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- --test res://tests/smoke_test.gd"
+	return "Usage: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --test res://tests/smoke_test.gd"
 
 
 func _fatal(message: String, code: int) -> void:

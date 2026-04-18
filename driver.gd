@@ -1,7 +1,7 @@
 extends RefCounted
 class_name GodoteerDriver
 
-const GodoteerScreen = preload("res://addons/godoteer_gd/screen.gd")
+const GodoteerScreen = preload("screen.gd")
 
 var tree: SceneTree
 var failure_sink: Object

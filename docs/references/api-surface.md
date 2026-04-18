@@ -2,12 +2,12 @@
 
 Path note:
 
-- `dev` branch stores addon under `sample_project/addons/godoteer_gd/`
-- published `main` branch flattens same files to repo root for cloning into `addons/godoteer_gd/`
+- `dev` branch stores addon under `sample_project/addons/godoteer/`
+- published `main` branch flattens same files to repo root for cloning into `addons/godoteer/`
 
 ## `GodoteerTestCase`
 
-File: `sample_project/addons/godoteer_gd/test_case.gd`
+File: `sample_project/addons/godoteer/test_case.gd`
 
 Lifecycle:
 
@@ -35,7 +35,7 @@ Behavior:
 
 ## `GodoteerDriver`
 
-File: `sample_project/addons/godoteer_gd/driver.gd`
+File: `sample_project/addons/godoteer/driver.gd`
 
 Role:
 
@@ -55,7 +55,7 @@ Accepted scene refs:
 
 ## `GodoteerScreen`
 
-File: `sample_project/addons/godoteer_gd/screen.gd`
+File: `sample_project/addons/godoteer/screen.gd`
 
 Timing:
 
@@ -153,7 +153,7 @@ Current role mapping:
 
 ## `GodoteerLocator`
 
-File: `sample_project/addons/godoteer_gd/locator.gd`
+File: `sample_project/addons/godoteer/locator.gd`
 
 Locator methods:
 
@@ -183,7 +183,7 @@ Behavior:
 
 ## `runner.gd`
 
-File: `sample_project/addons/godoteer_gd/runner.gd`
+File: `sample_project/addons/godoteer/runner.gd`
 
 Args:
 

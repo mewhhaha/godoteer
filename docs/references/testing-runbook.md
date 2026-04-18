@@ -7,22 +7,22 @@ These commands target source branch `dev`, where sample project lives.
 Headless smoke:
 
 ```bash
-godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- \
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/smoke_test.gd
 ```
 
 Windowed smoke:
 
 ```bash
-godot --path sample_project -s addons/godoteer_gd/runner.gd -- \
+godot --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/smoke_test.gd
 ```
 
 Parse-check common edited files:
 
 ```bash
-godot --headless --path sample_project --script addons/godoteer_gd/screen.gd --check-only
-godot --headless --path sample_project --script addons/godoteer_gd/locator.gd --check-only
+godot --headless --path sample_project --script addons/godoteer/screen.gd --check-only
+godot --headless --path sample_project --script addons/godoteer/locator.gd --check-only
 godot --headless --path sample_project --script tests/smoke_test.gd --check-only
 ```
 

@@ -7,43 +7,43 @@ Godoteer is GDScript-first harness for driving Godot scenes, composing input, qu
 Branch model:
 
 - `dev`: source branch with sample project, smoke tests, docs, publish automation
-- `main`: published addon branch flattened for cloning into `res://addons/godoteer_gd/`
+- `main`: published addon branch flattened for cloning into `res://addons/godoteer/`
 
 ## Top Level
 
 - `README.md`: short install and usage guide.
 - `docs/`: AI-oriented repo guide.
 - `sample_project/`: runnable demo project and current source of truth.
-- `sample_project/addons/godoteer_gd/`: harness library code.
+- `sample_project/addons/godoteer/`: harness library code.
 - `sample_project/tests/`: smoke coverage for public API.
 - `sample_project/scenes/` and `sample_project/scripts/`: fixture app used by smoke tests.
 
 ## Harness Files
 
-Source paths below are for `dev`. Published `main` branch flattens addon files from `sample_project/addons/godoteer_gd/` to repo root.
+Source paths below are for `dev`. Published `main` branch flattens addon files from `sample_project/addons/godoteer/` to repo root.
 
-- `sample_project/addons/godoteer_gd/runner.gd`
+- `sample_project/addons/godoteer/runner.gd`
   - CLI entry.
   - Parses `--test` and `--artifacts`.
   - Discovers `test_*` methods.
   - Creates one `GodoteerDriver` per suite run.
 
-- `sample_project/addons/godoteer_gd/test_case.gd`
+- `sample_project/addons/godoteer/test_case.gd`
   - Suite base class.
   - Owns collected failure list.
   - Exposes lifecycle hooks and assertion helpers.
 
-- `sample_project/addons/godoteer_gd/driver.gd`
+- `sample_project/addons/godoteer/driver.gd`
   - Session-level object passed into each `test_*`.
   - Opens and closes scene-backed `GodoteerScreen` instances.
 
-- `sample_project/addons/godoteer_gd/screen.gd`
+- `sample_project/addons/godoteer/screen.gd`
   - Per-scene interaction and query layer.
   - Composes input.
   - Resolves accessibility-first queries.
   - Exposes screenshot and accessibility inspection helpers.
 
-- `sample_project/addons/godoteer_gd/locator.gd`
+- `sample_project/addons/godoteer/locator.gd`
   - Strict query result wrapper.
   - Adds click/assert/wait helpers.
   - Doubles as scoped query root via `within()`.
