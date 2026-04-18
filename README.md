@@ -6,10 +6,11 @@ GDScript-first Godot test harness. Open scenes, drive input, query UI by accessi
 
 ## Installation
 
-Clone published branch into project `addons` folder:
+From your Godot project, move into `addons/` and clone published branch there:
 
 ```bash
-git clone git@github.com:mewhhaha/godoteer.git addons/godoteer_gd
+cd addons
+git clone git@github.com:mewhhaha/godoteer.git
 ```
 
 Then:
@@ -18,10 +19,10 @@ Then:
 2. Define `test_*` methods. Each test opens scene with `await driver.screen(...)`.
 3. Run suite with `res://addons/godoteer_gd/runner.gd`.
 
-Update addon later with:
+Update addon later from inside `addons/godoteer_gd`:
 
 ```bash
-git -C addons/godoteer_gd pull
+git pull
 ```
 
 ## Usage
