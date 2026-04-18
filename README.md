@@ -1,48 +1,47 @@
 # Godoteer
 
-GDScript-first test harness for Godot. Run scenes, compose input, assert state, and capture screenshots from Godot CLI.
+GDScript-first Godot test harness. Open scenes, drive input, query UI by accessibility-facing semantics, assert state, capture screenshots when renderer supports it.
 
 ## Installation
 
-1. Copy [sample_project/addons/godoteer_gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd) into your Godot project as `res://addons/godoteer_gd/`.
-2. Create test files that extend [test_case.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/test_case.gd).
-3. Run tests with [runner.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/runner.gd).
+1. Copy [sample_project/addons/godoteer_gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd) into your project as `res://addons/godoteer_gd/`.
+2. Create suite files that extend [sample_project/addons/godoteer_gd/test_case.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/test_case.gd).
+3. Define `test_*` methods. Each test opens scene with `await driver.screen(...)`.
+4. Run suite with [sample_project/addons/godoteer_gd/runner.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/runner.gd).
 
 ## Usage
 
-Run sample smoke test headless:
+Headless smoke run:
 
 ```bash
 godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- \
-  --scene res://scenes/sample_app.tscn \
   --test res://tests/smoke_test.gd
 ```
 
-Run windowed when you need screenshots:
+Windowed run for screenshot coverage:
 
 ```bash
 godot --path sample_project -s addons/godoteer_gd/runner.gd -- \
-  --scene res://scenes/sample_app.tscn \
   --test res://tests/smoke_test.gd
 ```
 
-Minimal test:
+Minimal suite:
 
 ```gdscript
 extends "res://addons/godoteer_gd/test_case.gd"
 
-func run(screen: GodoteerDriver) -> void:
-	var status = screen.get_by_name("StatusLabel")
-	var start_button = screen.get_by_role("button", "Start")
+const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 
-	status.expect_text("Idle")
-	await screen.move_mouse_between(Vector2(0, 0), Vector2(110, 120), 0.2, 12)
+func test_start_flow(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var start_button := screen.get_by_role("button", {"name": "Start"})
+
+	screen.get_by_text("Idle").expect_exists()
 	await start_button.click()
-	await status.wait_for_text("Started")
-	status.expect_text("Started")
+	await screen.find_by_text("Started")
 
 	if screen.can_screenshot():
 		screen.screenshot("started.png")
 ```
 
-Artifacts save under `user://artifacts`. Headless runs skip real screenshot capture on dummy renderer; use windowed mode for visual assertions.
+Preferred queries: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.

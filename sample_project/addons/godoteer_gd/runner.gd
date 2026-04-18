@@ -17,20 +17,6 @@ func _boot() -> void:
 		_fatal(config["error"], EXIT_USAGE)
 		return
 
-	var app_root: Node = root
-	var owns_scene := false
-	if config["scene"] != "":
-		var packed_scene: PackedScene = load(config["scene"])
-		if packed_scene == null:
-			_fatal("Could not load scene: %s" % config["scene"], EXIT_FAIL)
-			return
-
-		app_root = packed_scene.instantiate()
-		root.add_child(app_root)
-		current_scene = app_root
-		owns_scene = true
-		await process_frame
-
 	var script: Script = load(config["test"])
 	if script == null:
 		_fatal("Could not load test: %s" % config["test"], EXIT_FAIL)
@@ -45,11 +31,11 @@ func _boot() -> void:
 		_fatal("Test must extend GodoteerTestCase: %s" % config["test"], EXIT_FAIL)
 		return
 
-	var screen := GodoteerDriver.new(self, app_root, test_case, config["artifacts"])
-	test_case.bind(screen, app_root)
+	var driver := GodoteerDriver.new(self, test_case, config["artifacts"])
+	test_case.set_meta("godoteer_driver", driver)
 
 	print("GodoteerGD running %s" % config["test"])
-	await test_case.execute()
+	await _run_test_case(test_case, driver)
 
 	var exit_code := EXIT_OK
 	if test_case.has_failures():
@@ -62,19 +48,14 @@ func _boot() -> void:
 	else:
 		print("GodoteerGD PASS %s" % config["test"])
 
-	if owns_scene:
-		current_scene = null
-		app_root.queue_free()
-		await process_frame
-
+	test_case.remove_meta("godoteer_driver")
 	test_case = null
-	screen = null
+	driver = null
 	quit(exit_code)
 
 
 func _parse_args(args: PackedStringArray) -> Dictionary:
 	var config := {
-		"scene": "",
 		"test": "",
 		"artifacts": "user://artifacts",
 	}
@@ -83,11 +64,6 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 	while index < args.size():
 		var arg := args[index]
 		match arg:
-			"--scene":
-				index += 1
-				if index >= args.size():
-					return {"error": "Missing value after --scene"}
-				config["scene"] = args[index]
 			"--test":
 				index += 1
 				if index >= args.size():
@@ -112,9 +88,27 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 
 
 func _usage_text() -> String:
-	return "Usage: godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- --scene res://scenes/sample_app.tscn --test res://tests/smoke_test.gd"
+	return "Usage: godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- --test res://tests/smoke_test.gd"
 
 
 func _fatal(message: String, code: int) -> void:
 	printerr("GodoteerGD: %s" % message)
 	quit(code)
+
+
+func _run_test_case(test_case: GodoteerTestCase, driver: GodoteerDriver) -> void:
+	var test_methods := test_case.list_tests()
+	if test_methods.is_empty():
+		test_case.record_failure("No test methods found. Define methods named test_* in %s" % config_path(test_case))
+		return
+
+	for test_name in test_methods:
+		print("GodoteerGD test %s" % test_name)
+		await test_case.before_each(driver, test_name)
+		var test_callable := Callable(test_case, test_name)
+		await test_callable.callv([driver])
+		await test_case.after_each(driver, test_name)
+
+
+func config_path(test_case: GodoteerTestCase) -> String:
+	return test_case.get_script().resource_path

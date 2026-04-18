@@ -2,63 +2,68 @@
 
 ## Main Commands
 
-Headless smoke run:
+Headless smoke:
 
 ```bash
 godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- \
-  --scene res://scenes/sample_app.tscn \
   --test res://tests/smoke_test.gd
 ```
 
-Windowed smoke run:
+Windowed smoke:
 
 ```bash
 godot --path sample_project -s addons/godoteer_gd/runner.gd -- \
-  --scene res://scenes/sample_app.tscn \
   --test res://tests/smoke_test.gd
+```
+
+Parse-check common edited files:
+
+```bash
+godot --headless --path sample_project --script addons/godoteer_gd/screen.gd --check-only
+godot --headless --path sample_project --script addons/godoteer_gd/locator.gd --check-only
+godot --headless --path sample_project --script tests/smoke_test.gd --check-only
+```
+
+Validate docs skill:
+
+```bash
+python3 /home/mewhhaha/.codex/skills/.system/skill-creator/scripts/quick_validate.py docs
 ```
 
 ## Exit Codes
 
-- `0`: test pass
-- `1`: test failure or load error after usage was valid
-- `2`: CLI usage error from `runner.gd`
+- `0`: pass
+- `1`: test failure or load error
+- `2`: CLI usage error
 
 ## Artifact Path
 
-- Default artifacts target: `user://artifacts`
-- On this machine, demo artifacts resolved under:
-  - `~/.local/share/godot/app_userdata/Godoteer GDScript Demo/artifacts/`
+- Default artifact target: `user://artifacts`
+- Screenshot tests should guard with `if screen.can_screenshot():`
 
 ## Headless vs Windowed
 
-- Use headless for fast logic/integration checks.
-- Use windowed for screenshot verification.
-- Current `screen.can_screenshot()` returns `false` in headless mode to avoid dummy-renderer crashes.
-- If a test needs screenshots, guard with `if screen.can_screenshot():`.
+- Use headless for fast harness checks.
+- Use windowed when verifying screenshot capture.
+- Headless mode should report `screen.can_screenshot() == false`.
+- Smoke suite already guards screenshot path so one suite can run both modes.
 
-## Typical Failure Loop
+## Debug Loop
 
-1. Run headless smoke command.
-2. If failure mentions rendering or screenshots, rerun windowed.
-3. If failure mentions missing node/query, inspect sample scene tree and query semantics.
-4. If failure mentions timeout, inspect whether action emitted real signal or text change.
-5. Update fixture app and smoke test together when public behavior changes.
+1. Parse-check edited GDScript.
+2. Run headless smoke.
+3. If failure touches screenshots or rendering, rerun windowed.
+4. If failure touches queries, inspect accessible name, visible text, placeholder, and hidden-state rules.
+5. Update fixture app and smoke suite in same pass when public behavior changes.
 
-## Current Known Noise
+## Current Smoke Coverage
 
-- Godot still prints resource-leak warnings on exit after pass.
-- Treat current warnings as cleanup debt, not test failure, unless behavior changes or warnings grow.
-
-## Debugging Tips
-
-- Add targeted `print()` or `printerr()` inside `driver.gd`, `locator.gd`, or test file.
-- Prefer debugging with sample app first; it is fastest path to reproduce harness bugs.
-- If click behavior looks wrong, check whether node is `BaseButton`; driver short-circuits button clicks by emitting `pressed`.
-- If locator behavior looks wrong, verify whether query uses stable node name or volatile text.
-
-## Extending Coverage
-
-- Add new tests under `sample_project/tests/`.
-- Keep one small smoke test green before adding broader scenarios.
-- When adding new API surface, prove it in at least one test using public ergonomic call sites.
+- `get_by_role("button", {"name": "Start"})`
+- `get_by_text("Idle")`
+- `find_by_text("Started")`
+- `get_by_label_text("Player Name")`
+- `get_by_placeholder_text("Enter hero name")`
+- `get_by_node_name("FormPanel")` and scoped `within(...)`
+- accessibility name/description assertions
+- strict `get_*` and `query_*` zero-match behavior
+- screenshot guard via `can_screenshot()`

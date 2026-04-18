@@ -1,20 +1,64 @@
 extends "res://addons/godoteer_gd/test_case.gd"
 
+const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 
-func run(screen: GodoteerDriver) -> void:
-	var status = screen.get_by_name("StatusLabel")
-	var start_button = screen.get_by_role("button", "Start")
 
-	status.expect_exists("Idle label should exist")
-	status.expect_text("Idle", "Label should start idle")
-	start_button.expect_exists("Start button should exist")
+func test_accessibility_first_queries(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var form := screen.within(screen.get_by_node_name("FormPanel"))
+	var status := form.get_by_node_name("StatusLabel")
+	var start_button := form.get_by_role("button", {"name": "Start"})
+	var name_field := form.get_by_role("textbox", {"name": "Player Name"})
+	var label_field := form.get_by_label_text("Player Name")
+	var placeholder_field := form.get_by_placeholder_text("Enter hero name")
 
+	status.expect_text("Idle", "Status should start idle")
+	start_button.expect_exists("Start button should resolve by role and accessible name")
+	expect_equal(name_field.node(), label_field.node(), "Role and label query should find same input")
+	expect_equal(name_field.node(), placeholder_field.node(), "Placeholder query should find same input")
+	screen.expect_accessible_name(start_button, "Start")
+	screen.expect_accessible_description(start_button, "Starts sample flow")
+	screen.expect_accessible_description(status, "Current sample status")
+	screen.screen_reader_supported()
+	screen.screen_reader_active()
+
+
+func test_click_updates_visible_text_with_find(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var form := screen.within(screen.get_by_node_name("FormPanel"))
+	var start_button := form.get_by_role("button", {"name": "Start"})
+
+	screen.get_by_text("Idle").expect_exists("Idle text should be visible before click")
+	await screen.move_mouse_between(Vector2(0, 0), Vector2(120, 120), 0.05, 6)
 	await start_button.click()
 
-	var changed := await status.wait_for_text("Started", 2.0, 1, "Status label never changed to Started")
-	expect_true(changed, "wait_until should succeed")
-	status.expect_text("Started", "Button click should update label")
+	var started := await screen.find_by_text("Started")
+	expect_not_null(started, "find_by_text should wait for delayed Started text")
+	started.expect_text("Started", "Visible text should update after click")
 
+
+func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var missing := screen.query_by_text("Nope")
+
+	expect_equal(missing, null, "query_by_text should return null on zero matches")
+	expect_equal(drain_failures().size(), 0, "query_by_text zero matches should not record failure")
+
+
+func test_get_records_failure_for_zero_matches(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	set_failures_quiet(true)
+	var missing := screen.get_by_text("Nope")
+	set_failures_quiet(false)
+	var failures := drain_failures()
+
+	expect_equal(missing, null, "get_by_text should return null when it records failure")
+	expect_equal(failures.size(), 1, "get_by_text zero matches should record exactly one failure")
+	expect_true(str(failures[0]).contains("get_by_text"), "Failure should mention strict get_by_text lookup")
+
+
+func test_windowed_screenshot_if_available(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
 	if screen.can_screenshot():
 		var screenshot_path := screen.screenshot("smoke.png")
 		expect_true(FileAccess.file_exists(screenshot_path), "Screenshot should exist on disk")

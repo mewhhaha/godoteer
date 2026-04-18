@@ -1,39 +1,35 @@
 ---
 name: docs
-description: AI-oriented repo guide for Godoteer, a GDScript-first Godot testing harness. Use when working in this repository to understand file layout, run or debug the sample harness, extend the driver/locator/runner, diagnose headless versus windowed behavior, or onboard another agent quickly.
+description: AI-oriented repo guide for Godoteer, GDScript-first Godot testing harness. Use when changing harness internals, smoke tests, query semantics, accessibility-first APIs, screenshot behavior, or repo docs.
 ---
 
 # Docs
 
 ## Overview
 
-Use this skill to build context before editing Godoteer. Source of truth lives in `sample_project/addons/godoteer_gd/`; sample scene and smoke test double as runnable integration coverage.
+Use this skill when editing Godoteer. Source of truth lives in `sample_project/addons/godoteer_gd/`. Sample scene and smoke suite prove public contract.
 
 ## Read Order
 
-- Read [references/repo-map.md](references/repo-map.md) first when you need project layout, ownership, or runtime flow.
-- Read [references/testing-runbook.md](references/testing-runbook.md) before running Godot, debugging failures, or checking screenshot behavior.
-- Read [references/api-surface.md](references/api-surface.md) before editing `driver.gd`, `locator.gd`, `runner.gd`, or test ergonomics.
-- Read [references/caveats.md](references/caveats.md) before changing input composition, query semantics, screenshots, or cleanup behavior.
+- Read [references/repo-map.md](references/repo-map.md) first for layout and runtime flow.
+- Read [references/api-surface.md](references/api-surface.md) before touching public harness APIs.
+- Read [references/testing-runbook.md](references/testing-runbook.md) before running Godot or debugging failures.
+- Read [references/caveats.md](references/caveats.md) before changing queries, screenshots, or failure behavior.
 
 ## Core Workflow
 
-1. Build context from `references/repo-map.md`.
-2. Make changes in `sample_project/addons/godoteer_gd/` first; treat sample app and tests as integration fixtures.
-3. Run smoke coverage from `references/testing-runbook.md`.
-4. If behavior changed, update docs and sample test in same pass.
+1. Build context from repo map and API surface.
+2. Change harness code in `sample_project/addons/godoteer_gd/`.
+3. Update fixture app and `sample_project/tests/smoke_test.gd` in same pass when public behavior changes.
+4. Parse-check modified GDScript.
+5. Run headless smoke. Run windowed too when screenshot coverage matters.
+6. Update docs in same pass.
 
 ## Working Rules
 
-- Keep repo GDScript-first. Old JS bridge path was removed.
-- Preserve current contract: tests aggregate failures in `GodoteerTestCase`; `runner.gd` converts result to exit code.
-- Preserve screenshot guardrails: headless mode should not pretend screenshot capture works.
-- Prefer stable queries like `get_by_name()` or `get_by_role()` over text-only queries when text changes during test flow.
-- Keep docs high-signal. Put durable repo knowledge here; keep transient observations in commit messages or issues.
-
-## References
-
-- [references/repo-map.md](references/repo-map.md)
-- [references/testing-runbook.md](references/testing-runbook.md)
-- [references/api-surface.md](references/api-surface.md)
-- [references/caveats.md](references/caveats.md)
+- Keep repo GDScript-first.
+- Preserve suite model: files expose `test_*` methods, each test opens scene with `await driver.screen(...)`.
+- Prefer accessibility-first queries: role/name, visible text, label text, placeholder text.
+- Treat `get_by_node_name()` as escape hatch only.
+- Keep strict cardinality semantics aligned with Testing Library style.
+- Keep screenshot guardrails honest: headless mode must not pretend screenshot capture works.

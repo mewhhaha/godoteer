@@ -11,18 +11,30 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="FormPanel" type="VBoxContainer" parent="."]
 layout_mode = 0
 offset_left = 40.0
 offset_top = 32.0
-offset_right = 280.0
-offset_bottom = 64.0
-text = "Idle"
+offset_right = 320.0
+offset_bottom = 220.0
 
-[node name="ActionButton" type="Button" parent="."]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 100.0
-offset_right = 180.0
-offset_bottom = 140.0
+[node name="StatusLabel" type="Label" parent="FormPanel"]
+layout_mode = 2
+text = "Idle"
+accessibility_description = "Current sample status"
+
+[node name="NameLabel" type="Label" parent="FormPanel"]
+layout_mode = 2
+text = "Player Name"
+
+[node name="NameInput" type="LineEdit" parent="FormPanel"]
+layout_mode = 2
+placeholder_text = "Enter hero name"
+accessibility_name = "Player Name"
+accessibility_description = "Type player name before starting"
+
+[node name="ActionButton" type="Button" parent="FormPanel"]
+layout_mode = 2
 text = "Start"
+accessibility_name = "Start"
+accessibility_description = "Starts sample flow"
