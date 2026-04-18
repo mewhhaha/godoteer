@@ -4,7 +4,8 @@ const EXIT_OK := 0
 const EXIT_FAIL := 1
 const EXIT_USAGE := 2
 const GodoteerDriver = preload("driver.gd")
-const GodoteerTestCase = preload("test_case.gd")
+const GodoteerTest = preload("test.gd")
+const GodoteerSceneTest = preload("test_scene.gd")
 
 
 func _initialize() -> void:
@@ -27,15 +28,22 @@ func _boot() -> void:
 		_fatal("Could not instantiate test: %s" % config["test"], EXIT_FAIL)
 		return
 
-	if not test_case is GodoteerTestCase:
-		_fatal("Test must extend GodoteerTestCase: %s" % config["test"], EXIT_FAIL)
+	var driver: GodoteerDriver = null
+	var is_scene_test := test_case is GodoteerSceneTest
+	var is_unit_test := test_case is GodoteerTest
+	if not is_scene_test and not is_unit_test:
+		_fatal("Test must extend res://addons/godoteer/test.gd or res://addons/godoteer/test_scene.gd: %s" % config["test"], EXIT_FAIL)
 		return
 
-	var driver := GodoteerDriver.new(self, test_case, config["artifacts"])
-	test_case.set_meta("godoteer_driver", driver)
+	if is_scene_test:
+		driver = GodoteerDriver.new(self, test_case, config["artifacts"])
+		test_case.set_meta("godoteer_driver", driver)
 
 	print("GodoteerGD running %s" % config["test"])
-	await _run_test_case(test_case, driver)
+	if is_scene_test:
+		await _run_scene_test_case(test_case, driver)
+	else:
+		await _run_unit_test_case(test_case)
 
 	var exit_code := EXIT_OK
 	if test_case.has_failures():
@@ -48,7 +56,8 @@ func _boot() -> void:
 	else:
 		print("GodoteerGD PASS %s" % config["test"])
 
-	test_case.remove_meta("godoteer_driver")
+	if is_scene_test:
+		test_case.remove_meta("godoteer_driver")
 	test_case = null
 	driver = null
 	quit(exit_code)
@@ -88,7 +97,7 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 
 
 func _usage_text() -> String:
-	return "Usage: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --test res://tests/smoke_test.gd"
+	return "Usage: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --test res://tests/scene/smoke_test.gd"
 
 
 func _fatal(message: String, code: int) -> void:
@@ -96,7 +105,21 @@ func _fatal(message: String, code: int) -> void:
 	quit(code)
 
 
-func _run_test_case(test_case: GodoteerTestCase, driver: GodoteerDriver) -> void:
+func _run_unit_test_case(test_case: GodoteerTest) -> void:
+	var test_methods := test_case.list_tests()
+	if test_methods.is_empty():
+		test_case.record_failure("No test methods found. Define methods named test_* in %s" % config_path(test_case))
+		return
+
+	for test_name in test_methods:
+		print("GodoteerGD test %s" % test_name)
+		await test_case.before_each(test_name)
+		var test_callable := Callable(test_case, test_name)
+		await test_callable.callv([])
+		await test_case.after_each(test_name)
+
+
+func _run_scene_test_case(test_case: GodoteerSceneTest, driver: GodoteerDriver) -> void:
 	var test_methods := test_case.list_tests()
 	if test_methods.is_empty():
 		test_case.record_failure("No test methods found. Define methods named test_* in %s" % config_path(test_case))
@@ -110,5 +133,5 @@ func _run_test_case(test_case: GodoteerTestCase, driver: GodoteerDriver) -> void
 		await test_case.after_each(driver, test_name)
 
 
-func config_path(test_case: GodoteerTestCase) -> String:
+func config_path(test_case: Object) -> String:
 	return test_case.get_script().resource_path

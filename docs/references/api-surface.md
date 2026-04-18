@@ -5,33 +5,65 @@ Path note:
 - `dev` branch stores addon under `sample_project/addons/godoteer/`
 - published `main` branch flattens same files to repo root for cloning into `addons/godoteer/`
 
-## `GodoteerTestCase`
+## `GodoteerBaseTest`
 
-File: `sample_project/addons/godoteer/test_case.gd`
+File: `sample_project/addons/godoteer/test_base.gd`
+
+Shared failure and discovery behavior:
+
+- `list_tests()`
+- `record_failure(message)`
+- `has_failures()`
+- `failure_count()`
+- `summary()`
+- `drain_failures()`
+- `set_failures_quiet(enabled)`
+- `fail(message)`
+- `expect(condition, ...details)`
+
+`expect(...)` formatting:
+
+- no details -> `Expectation failed`
+- details -> `Expectation failed: ` plus `str(...)`-joined detail list
+
+## `GodoteerTest`
+
+File: `sample_project/addons/godoteer/test.gd`
+
+Role:
+
+- Public base for pure unit tests
+
+Lifecycle:
+
+- `before_each(test_name)`
+- `after_each(test_name)`
+
+Test shape:
+
+- `func test_*() -> void`
+
+## `GodoteerSceneTest`
+
+File: `sample_project/addons/godoteer/test_scene.gd`
+
+Role:
+
+- Public base for scene and driver tests
 
 Lifecycle:
 
 - `before_each(driver, test_name)`
-- `after_each(driver, test_name)`
-- `list_tests()`
+- `after_each(driver, test_name)` resets driver by default
 
-Assertions and failure helpers:
+Scene-only helpers:
 
-- `fail(message)`
-- `expect_true(condition, message)`
-- `expect_false(condition, message)`
-- `expect_equal(actual, expected, message)`
-- `expect_not_null(value, message)`
-- `expect_node(path_or_node, message)`
-- `expect_property(path_or_node, property_name, expected, message)`
-- `drain_failures()`
-- `set_failures_quiet(enabled)`
+- `expect_node(path_or_node, message = "")`
+- `expect_property(path_or_node, property_name, expected, message = "")`
 
-Behavior:
+Test shape:
 
-- Suite files expose `test_*` methods.
-- Assertions collect failures instead of aborting immediately.
-- `drain_failures()` exists so smoke tests can verify expected failures from strict `get_*` semantics.
+- `func test_*(driver: GodoteerDriver) -> void`
 
 ## `GodoteerDriver`
 
@@ -39,8 +71,8 @@ File: `sample_project/addons/godoteer/driver.gd`
 
 Role:
 
-- Session-level suite object.
-- Opens and closes scene-backed `GodoteerScreen` instances.
+- Session-level scene object for scene suites only
+- Opens and closes scene-backed `GodoteerScreen` instances
 
 Methods:
 
@@ -94,62 +126,17 @@ Accessibility helpers:
 
 Accessibility-first queries:
 
-- Role:
-  - `get_by_role(role, options = {})`
-  - `query_by_role(role, options = {})`
-  - `find_by_role(role, options = {})`
-  - `get_all_by_role(role, options = {})`
-  - `query_all_by_role(role, options = {})`
-  - `find_all_by_role(role, options = {})`
-- Visible text:
-  - `get_by_text(text, options = {})`
-  - `query_by_text(text, options = {})`
-  - `find_by_text(text, options = {})`
-- Label text:
-  - `get_by_label_text(text, options = {})`
-  - `query_by_label_text(text, options = {})`
-  - `find_by_label_text(text, options = {})`
-- Placeholder text:
-  - `get_by_placeholder_text(text, options = {})`
-  - `query_by_placeholder_text(text, options = {})`
-  - `find_by_placeholder_text(text, options = {})`
-- Escape hatch:
-  - `get_by_node_name(name, root_target = null)`
-  - `query_by_node_name(name, root_target = null)`
+- `get/query/find/get_all/query_all/find_all_by_role(...)`
+- `get/query/find_by_text(...)`
+- `get/query/find_by_label_text(...)`
+- `get/query/find_by_placeholder_text(...)`
+- `get/query_by_node_name(...)`
 
-Query options:
+Query semantics:
 
-- `name`: only for role queries
-- `exact`: default `true`
-- `include_hidden`: default `false`
-
-Cardinality semantics:
-
-- `get_*`: fail on zero or multiple
-- `query_*`: `null` on zero, fail on multiple
-- `find_*`: poll until exact single match, fail on timeout
-- `get_all_*`: fail on zero
-- `query_all_*`: empty array on zero
-- `find_all_*`: poll until at least one match
-
-Matching model:
-
-- Role name matching uses accessible name, not node name.
-- Accessible name order:
-  - `Control.accessibility_name`
-  - visible text for controls that naturally expose text
-  - never raw node name
-- `get_by_text()` matches visible rendered text only.
-- `get_by_placeholder_text()` matches textbox placeholder text only.
-- `get_by_node_name()` matches `Node.name` only and is not preferred.
-
-Current role mapping:
-
-- `CheckBox`, `CheckButton` -> `checkbox`
-- `OptionButton` -> `combobox`
-- `LineEdit`, `TextEdit` -> `textbox`
-- `BaseButton` -> `button`
-- `Label`, `RichTextLabel` -> `text`
+- `get_*`: fail on zero or multiple, no waiting
+- `query_*`: `null` on zero, fail on multiple, no waiting
+- `find_*`: wait up to timeout and fail on timeout
 
 ## `GodoteerLocator`
 
@@ -176,11 +163,6 @@ Scoped query helpers:
 - `get/query/find_by_placeholder_text(...)`
 - `get/query_by_node_name(...)`
 
-Behavior:
-
-- Locator usually wraps one strict query result.
-- Locator can also act as scoped root for `within()` and child queries.
-
 ## `runner.gd`
 
 File: `sample_project/addons/godoteer/runner.gd`
@@ -192,7 +174,8 @@ Args:
 
 Behavior:
 
-- Loads suite script and enforces `GodoteerTestCase` inheritance.
-- Discovers `test_*` methods in sorted order.
-- Passes one `GodoteerDriver` session into each test method.
-- Exits `0` on pass, `1` on failure/load error, `2` on usage error.
+- Loads suite script and enforces `GodoteerTest` or `GodoteerSceneTest` inheritance
+- Discovers `test_*` methods in sorted order
+- Unit suites run with zero-arg tests and no driver allocation
+- Scene suites create one `GodoteerDriver` and pass it to each test
+- Exits `0` on pass, `1` on failure/load error, `2` on usage error

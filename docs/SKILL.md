@@ -7,7 +7,7 @@ description: AI-oriented repo guide for Godoteer, GDScript-first Godot testing h
 
 ## Overview
 
-Use this skill when editing Godoteer. Source of truth lives in `sample_project/addons/godoteer/`. Sample scene and smoke suite prove public contract.
+Use this skill when editing Godoteer. Source of truth lives in `sample_project/addons/godoteer/`. Sample unit and scene suites prove public contract.
 
 ## Read Order
 
@@ -20,7 +20,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 
 1. Build context from repo map and API surface.
 2. Change harness code in `sample_project/addons/godoteer/`.
-3. Update fixture app and `sample_project/tests/smoke_test.gd` in same pass when public behavior changes.
+3. Update fixture app and sample tests in `sample_project/tests/unit/` and `sample_project/tests/scene/` in same pass when public behavior changes.
 4. Parse-check modified GDScript.
 5. Run headless smoke. Run windowed too when screenshot coverage matters.
 6. Update docs in same pass.
@@ -29,7 +29,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 
 - Keep repo GDScript-first.
 - `dev` is source branch. `main` is generated publish branch.
-- Preserve suite model: files expose `test_*` methods, each test opens scene with `await driver.screen(...)`.
+- Preserve suite model: files expose `test_*` methods. Unit suites extend `test.gd`. Scene suites extend `test_scene.gd` and open scenes with `await driver.screen(...)`.
 - Prefer accessibility-first queries: role/name, visible text, label text, placeholder text.
 - Treat `get_by_node_name()` as escape hatch only.
 - Keep strict cardinality semantics aligned with Testing Library style.
