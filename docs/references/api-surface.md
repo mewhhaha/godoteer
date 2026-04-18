@@ -6,14 +6,14 @@ File: `sample_project/addons/godoteer_gd/test_case.gd`
 
 Lifecycle:
 
-- `before_each()`
-- `run()`
-- `after_each()`
+- `before_each(screen)`
+- `run(screen)`
+- `after_each(screen)`
 - `execute()` runs those in order
 
 State:
 
-- `driver`: bound `GodoteerDriver`
+- `screen`: bound `GodoteerDriver`
 - `app_root`: loaded scene root
 - `failures`: collected failure messages
 
@@ -53,6 +53,8 @@ Actions:
 
 - `await click(target, button = MOUSE_BUTTON_LEFT)`
 - `mouse_move(position)`
+- `await move_mouse_between(from_position, to_position, duration_sec = 0.2, steps = 12)`
+- `await move_mouse_to(to_position, duration_sec = 0.2, steps = 12)`
 - `mouse_button(position, button = MOUSE_BUTTON_LEFT, pressed = true)`
 - `await key_tap(keycode)`
 
@@ -94,6 +96,13 @@ Click semantics:
 - `BaseButton` does not receive composed mouse events.
 - Driver emits `pressed` directly after `grab_focus()`.
 - Other supported targets resolve to `Control` center point, `Node2D.global_position`, or explicit `Vector2`.
+
+Mouse motion semantics:
+
+- Driver tracks `last_mouse_position`.
+- `move_mouse_between()` interpolates from point A to point B.
+- Duration is explicit in seconds.
+- `steps` controls how many intermediate motion events get emitted.
 
 ## `GodoteerLocator`
 

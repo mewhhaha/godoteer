@@ -45,8 +45,8 @@ func _boot() -> void:
 		_fatal("Test must extend GodoteerTestCase: %s" % config["test"], EXIT_FAIL)
 		return
 
-	var driver := GodoteerDriver.new(self, app_root, test_case, config["artifacts"])
-	test_case.bind(driver, app_root)
+	var screen := GodoteerDriver.new(self, app_root, test_case, config["artifacts"])
+	test_case.bind(screen, app_root)
 
 	print("GodoteerGD running %s" % config["test"])
 	await test_case.execute()
@@ -68,7 +68,7 @@ func _boot() -> void:
 		await process_frame
 
 	test_case = null
-	driver = null
+	screen = null
 	quit(exit_code)
 
 

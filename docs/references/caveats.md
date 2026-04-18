@@ -4,7 +4,7 @@
 
 - Headless Godot on this setup uses dummy rendering.
 - `Viewport.get_texture()` may be null in headless mode.
-- `driver.can_screenshot()` guards against this and should stay in sync with real renderer behavior.
+- `screen.can_screenshot()` guards against this and should stay in sync with real renderer behavior.
 - Use windowed runs for visual assertions.
 
 ## Query Caveats
@@ -25,6 +25,12 @@
 - `BaseButton` clicks are semantic, not physical.
 - Driver emits `pressed` directly because composed mouse input was unreliable for buttons.
 - This means button coverage proves user-intent flow, not low-level event propagation.
+
+## Mouse Motion Model
+
+- Mouse motion uses interpolated `InputEventMouseMotion` events.
+- Duration is approximate because timing still depends on Godot timers and frame scheduling.
+- `move_mouse_to()` starts from tracked `last_mouse_position`, which defaults to `Vector2.ZERO` until first motion or button event.
 
 ## Cleanup Warnings
 

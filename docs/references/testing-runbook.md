@@ -34,8 +34,8 @@ godot --path sample_project -s addons/godoteer_gd/runner.gd -- \
 
 - Use headless for fast logic/integration checks.
 - Use windowed for screenshot verification.
-- Current `driver.can_screenshot()` returns `false` in headless mode to avoid dummy-renderer crashes.
-- If a test needs screenshots, guard with `if driver.can_screenshot():`.
+- Current `screen.can_screenshot()` returns `false` in headless mode to avoid dummy-renderer crashes.
+- If a test needs screenshots, guard with `if screen.can_screenshot():`.
 
 ## Typical Failure Loop
 

@@ -7,6 +7,7 @@ var tree: SceneTree
 var app_root: Node
 var failure_sink: Object
 var artifacts_dir := "user://artifacts"
+var last_mouse_position := Vector2.ZERO
 
 
 func _init(scene_tree: SceneTree, root_node: Node, sink: Object, artifacts_path: String = "user://artifacts") -> void:
@@ -108,6 +109,7 @@ func mouse_move(position: Vector2) -> void:
 	event.position = position
 	event.global_position = position
 	Input.parse_input_event(event)
+	last_mouse_position = position
 
 
 func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: bool = true) -> void:
@@ -117,6 +119,39 @@ func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: b
 	event.button_index = button
 	event.pressed = pressed
 	Input.parse_input_event(event)
+	last_mouse_position = position
+
+
+func move_mouse_between(
+	from_position: Vector2,
+	to_position: Vector2,
+	duration_sec: float = 0.2,
+	steps: int = 12
+) -> void:
+	mouse_move(from_position)
+
+	var distance := from_position.distance_to(to_position)
+	if distance <= 0.0:
+		await wait_frames(1)
+		return
+
+	var safe_steps: int = max(1, steps)
+	var safe_duration_sec: float = max(duration_sec, 0.0)
+	var delay_sec: float = safe_duration_sec / float(safe_steps)
+
+	for index in range(1, safe_steps + 1):
+		var weight := float(index) / float(safe_steps)
+		mouse_move(from_position.lerp(to_position, weight))
+		if delay_sec > 0.0:
+			await tree.create_timer(delay_sec).timeout
+
+
+func move_mouse_to(
+	to_position: Vector2,
+	duration_sec: float = 0.2,
+	steps: int = 12
+) -> void:
+	await move_mouse_between(last_mouse_position, to_position, duration_sec, steps)
 
 
 func key_tap(keycode: Key) -> void:
