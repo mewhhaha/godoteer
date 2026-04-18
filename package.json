@@ -1,0 +1,12 @@
+{
+  "name": "godoteer",
+  "version": "0.1.0",
+  "description": "Tiny Playwright-style driver for Godot projects",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
