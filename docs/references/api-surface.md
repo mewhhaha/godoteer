@@ -1,5 +1,10 @@
 # API Surface
 
+Path note:
+
+- `dev` branch stores addon under `sample_project/addons/godoteer_gd/`
+- published `main` branch flattens same files to repo root for cloning into `addons/godoteer_gd/`
+
 ## `GodoteerTestCase`
 
 File: `sample_project/addons/godoteer_gd/test_case.gd`
