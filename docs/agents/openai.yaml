@@ -1,0 +1,4 @@
+interface:
+  display_name: "Godoteer Docs"
+  short_description: "Repo guide for AI agents working on Godoteer."
+  default_prompt: "Use this repo guide to navigate Godoteer, run tests, understand architecture, and extend the GDScript harness safely."

@@ -2,7 +2,7 @@
 
 Simple Playwright-like test harness for Godot. GDScript-first path now.
 
-Goal: run Godot scene, compose inputs, take screenshots, make assertions, exit pass/fail. No JS bridge needed for first version.
+Goal: run Godot scene, compose inputs, take screenshots, make assertions, exit pass/fail.
 
 ## GDScript-first shape
 
@@ -17,6 +17,7 @@ Goal: run Godot scene, compose inputs, take screenshots, make assertions, exit p
 - [sample_project/addons/godoteer_gd/test_case.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/test_case.gd)
 - [sample_project/addons/godoteer_gd/driver.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/driver.gd)
 - [sample_project/tests/smoke_test.gd](/home/mewhhaha/src/godoteer/sample_project/tests/smoke_test.gd)
+- [docs/SKILL.md](/home/mewhhaha/src/godoteer/docs/SKILL.md)
 
 ## Run demo
 
@@ -76,7 +77,3 @@ func run() -> void:
 - Assertions collect failures; no exception-based abort yet.
 - Headless mode may disable screenshot capture entirely with dummy renderer. Run windowed for visual assertions.
 - Input helpers know `Control`, `Node2D`, `Vector2`. More node kinds need more adapters.
-
-## Old JS path
-
-JS bridge still exists in [src/godoteer.js](/home/mewhhaha/src/godoteer/src/godoteer.js). Keep as future outer harness if we want richer CI/reporting later.
