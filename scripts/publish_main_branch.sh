@@ -26,7 +26,7 @@ find "$PUBLISH_DIR" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
 
 cp README.md "$PUBLISH_DIR/README.md"
 cp -R docs "$PUBLISH_DIR/docs"
-cp -R sample_project/addons/godoteer_gd/. "$PUBLISH_DIR/"
+cp -R sample_project/addons/godoteer/. "$PUBLISH_DIR/"
 
 git -C "$PUBLISH_DIR" add -A
 

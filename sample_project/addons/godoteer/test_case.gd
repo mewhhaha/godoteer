@@ -1,7 +1,7 @@
 extends RefCounted
 class_name GodoteerTestCase
 
-const GodoteerDriver = preload("res://addons/godoteer_gd/driver.gd")
+const GodoteerDriver = preload("driver.gd")
 
 var failures: Array[String] = []
 var quiet_failures := false

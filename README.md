@@ -2,7 +2,7 @@
 
 GDScript-first Godot test harness. Open scenes, drive input, query UI by accessibility-facing semantics, assert state, capture screenshots when renderer supports it.
 
-`dev` keeps source repo and sample project. `main` is published addon branch meant to clone into `res://addons/godoteer_gd/`.
+`dev` keeps source repo and sample project. `main` is published addon branch meant to clone into `res://addons/godoteer/`.
 
 ## Installation
 
@@ -15,11 +15,11 @@ git clone git@github.com:mewhhaha/godoteer.git
 
 Then:
 
-1. Create suite files that extend `res://addons/godoteer_gd/test_case.gd`.
+1. Create suite files that extend `res://addons/godoteer/test_case.gd`.
 2. Define `test_*` methods. Each test opens scene with `await driver.screen(...)`.
-3. Run suite with `res://addons/godoteer_gd/runner.gd`.
+3. Run suite with `res://addons/godoteer/runner.gd`.
 
-Update addon later from inside `addons/godoteer_gd`:
+Update addon later from inside `addons/godoteer`:
 
 ```bash
 git pull
@@ -30,21 +30,21 @@ git pull
 Headless smoke run:
 
 ```bash
-godot --headless --path sample_project -s addons/godoteer_gd/runner.gd -- \
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/smoke_test.gd
 ```
 
 Windowed run for screenshot coverage:
 
 ```bash
-godot --path sample_project -s addons/godoteer_gd/runner.gd -- \
+godot --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/smoke_test.gd
 ```
 
 Minimal suite:
 
 ```gdscript
-extends "res://addons/godoteer_gd/test_case.gd"
+extends "res://addons/godoteer/test_case.gd"
 
 const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 

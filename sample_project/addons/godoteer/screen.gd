@@ -1,7 +1,7 @@
 extends RefCounted
 class_name GodoteerScreen
 
-const GodoteerLocator = preload("res://addons/godoteer_gd/locator.gd")
+const GodoteerLocator = preload("locator.gd")
 
 var tree: SceneTree
 var app_root: Node

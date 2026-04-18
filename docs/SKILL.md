@@ -7,7 +7,7 @@ description: AI-oriented repo guide for Godoteer, GDScript-first Godot testing h
 
 ## Overview
 
-Use this skill when editing Godoteer. Source of truth lives in `sample_project/addons/godoteer_gd/`. Sample scene and smoke suite prove public contract.
+Use this skill when editing Godoteer. Source of truth lives in `sample_project/addons/godoteer/`. Sample scene and smoke suite prove public contract.
 
 ## Read Order
 
@@ -19,7 +19,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 ## Core Workflow
 
 1. Build context from repo map and API surface.
-2. Change harness code in `sample_project/addons/godoteer_gd/`.
+2. Change harness code in `sample_project/addons/godoteer/`.
 3. Update fixture app and `sample_project/tests/smoke_test.gd` in same pass when public behavior changes.
 4. Parse-check modified GDScript.
 5. Run headless smoke. Run windowed too when screenshot coverage matters.

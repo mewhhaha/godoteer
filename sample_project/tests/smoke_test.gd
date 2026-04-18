@@ -1,4 +1,4 @@
-extends "res://addons/godoteer_gd/test_case.gd"
+extends "res://addons/godoteer/test_case.gd"
 
 const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 
