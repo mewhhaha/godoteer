@@ -2,6 +2,8 @@
 
 ## Main Commands
 
+These commands target source branch `dev`, where sample project lives.
+
 Headless smoke:
 
 ```bash

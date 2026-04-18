@@ -2,12 +2,27 @@
 
 GDScript-first Godot test harness. Open scenes, drive input, query UI by accessibility-facing semantics, assert state, capture screenshots when renderer supports it.
 
+`dev` keeps source repo and sample project. `main` is published addon branch meant to clone into `res://addons/godoteer_gd/`.
+
 ## Installation
 
-1. Copy [sample_project/addons/godoteer_gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd) into your project as `res://addons/godoteer_gd/`.
-2. Create suite files that extend [sample_project/addons/godoteer_gd/test_case.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/test_case.gd).
-3. Define `test_*` methods. Each test opens scene with `await driver.screen(...)`.
-4. Run suite with [sample_project/addons/godoteer_gd/runner.gd](/home/mewhhaha/src/godoteer/sample_project/addons/godoteer_gd/runner.gd).
+Clone published branch into project `addons` folder:
+
+```bash
+git clone git@github.com:mewhhaha/godoteer.git addons/godoteer_gd
+```
+
+Then:
+
+1. Create suite files that extend `res://addons/godoteer_gd/test_case.gd`.
+2. Define `test_*` methods. Each test opens scene with `await driver.screen(...)`.
+3. Run suite with `res://addons/godoteer_gd/runner.gd`.
+
+Update addon later with:
+
+```bash
+git -C addons/godoteer_gd pull
+```
 
 ## Usage
 

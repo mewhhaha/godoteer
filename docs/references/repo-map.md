@@ -4,6 +4,11 @@
 
 Godoteer is GDScript-first harness for driving Godot scenes, composing input, querying UI by accessibility-facing semantics, asserting state, and taking screenshots when renderer supports it.
 
+Branch model:
+
+- `dev`: source branch with sample project, smoke tests, docs, publish automation
+- `main`: published addon branch flattened for cloning into `res://addons/godoteer_gd/`
+
 ## Top Level
 
 - `README.md`: short install and usage guide.
@@ -14,6 +19,8 @@ Godoteer is GDScript-first harness for driving Godot scenes, composing input, qu
 - `sample_project/scenes/` and `sample_project/scripts/`: fixture app used by smoke tests.
 
 ## Harness Files
+
+Source paths below are for `dev`. Published `main` branch flattens addon files from `sample_project/addons/godoteer_gd/` to repo root.
 
 - `sample_project/addons/godoteer_gd/runner.gd`
   - CLI entry.

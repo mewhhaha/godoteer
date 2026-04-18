@@ -28,6 +28,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 ## Working Rules
 
 - Keep repo GDScript-first.
+- `dev` is source branch. `main` is generated publish branch.
 - Preserve suite model: files expose `test_*` methods, each test opens scene with `await driver.screen(...)`.
 - Prefer accessibility-first queries: role/name, visible text, label text, placeholder text.
 - Treat `get_by_node_name()` as escape hatch only.
