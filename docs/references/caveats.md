@@ -46,9 +46,10 @@
 
 ## Failure Model
 
-- Assertions collect failures and keep running.
+- `expect(...)` and explicit failures collect messages and keep running.
 - Good for multi-assert diagnostics.
 - Bad for fail-fast expectations unless test drains or inspects failures intentionally.
+- Unit and scene suites share same failure collector.
 
 ## Missing Features
 

@@ -1,4 +1,4 @@
-extends "res://addons/godoteer/test_case.gd"
+extends "res://addons/godoteer/test_scene.gd"
 
 const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 
@@ -14,8 +14,8 @@ func test_accessibility_first_queries(driver: GodoteerDriver) -> void:
 
 	status.expect_text("Idle", "Status should start idle")
 	start_button.expect_exists("Start button should resolve by role and accessible name")
-	expect_equal(name_field.node(), label_field.node(), "Role and label query should find same input")
-	expect_equal(name_field.node(), placeholder_field.node(), "Placeholder query should find same input")
+	expect(name_field.node() == label_field.node(), "Role and label query should find same input")
+	expect(name_field.node() == placeholder_field.node(), "Placeholder query should find same input")
 	screen.expect_accessible_name(start_button, "Start")
 	screen.expect_accessible_description(start_button, "Starts sample flow")
 	screen.expect_accessible_description(status, "Current sample status")
@@ -33,16 +33,17 @@ func test_click_updates_visible_text_with_find(driver: GodoteerDriver) -> void:
 	await start_button.click()
 
 	var started := await screen.find_by_text("Started")
-	expect_not_null(started, "find_by_text should wait for delayed Started text")
-	started.expect_text("Started", "Visible text should update after click")
+	expect(started != null, "find_by_text should wait for delayed Started text")
+	if started != null:
+		started.expect_text("Started", "Visible text should update after click")
 
 
 func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
 	var missing := screen.query_by_text("Nope")
 
-	expect_equal(missing, null, "query_by_text should return null on zero matches")
-	expect_equal(drain_failures().size(), 0, "query_by_text zero matches should not record failure")
+	expect(missing == null, "query_by_text should return null on zero matches")
+	expect(drain_failures().size() == 0, "query_by_text zero matches should not record failure")
 
 
 func test_get_records_failure_for_zero_matches(driver: GodoteerDriver) -> void:
@@ -52,13 +53,13 @@ func test_get_records_failure_for_zero_matches(driver: GodoteerDriver) -> void:
 	set_failures_quiet(false)
 	var failures := drain_failures()
 
-	expect_equal(missing, null, "get_by_text should return null when it records failure")
-	expect_equal(failures.size(), 1, "get_by_text zero matches should record exactly one failure")
-	expect_true(str(failures[0]).contains("get_by_text"), "Failure should mention strict get_by_text lookup")
+	expect(missing == null, "get_by_text should return null when it records failure")
+	expect(failures.size() == 1, "get_by_text zero matches should record exactly one failure", failures)
+	expect(str(failures[0]).contains("get_by_text"), "Failure should mention strict get_by_text lookup", failures)
 
 
 func test_windowed_screenshot_if_available(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
 	if screen.can_screenshot():
 		var screenshot_path := screen.screenshot("smoke.png")
-		expect_true(FileAccess.file_exists(screenshot_path), "Screenshot should exist on disk")
+		expect(FileAccess.file_exists(screenshot_path), "Screenshot should exist on disk", screenshot_path)
