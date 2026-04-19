@@ -33,6 +33,24 @@ placeholder_text = "Enter hero name"
 accessibility_name = "Player Name"
 accessibility_description = "Type player name before starting"
 
+[node name="TermsToggle" type="CheckBox" parent="FormPanel"]
+layout_mode = 2
+text = "Accept Terms"
+accessibility_description = "Accept terms before starting"
+
+[node name="RoleSelect" type="OptionButton" parent="FormPanel"]
+layout_mode = 2
+item_count = 3
+popup/item_0/text = "Mage"
+popup/item_0/id = 0
+popup/item_1/text = "Rogue"
+popup/item_1/id = 1
+popup/item_2/text = "Warrior"
+popup/item_2/id = 2
+selected = 0
+accessibility_name = "Role"
+accessibility_description = "Choose player role"
+
 [node name="ActionButton" type="Button" parent="FormPanel"]
 layout_mode = 2
 text = "Start"

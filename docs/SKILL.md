@@ -22,7 +22,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 2. Change harness code in `sample_project/addons/godoteer/`.
 3. Update fixture app and sample tests in `sample_project/tests/unit/` and `sample_project/tests/scene/` in same pass when public behavior changes.
 4. Parse-check modified GDScript.
-5. Run headless smoke. Run windowed too when screenshot coverage matters.
+5. Run headless unit, scene, and directory coverage. Run windowed too when screenshot coverage matters.
 6. Update docs in same pass.
 
 ## Working Rules
@@ -30,6 +30,7 @@ Use this skill when editing Godoteer. Source of truth lives in `sample_project/a
 - Keep repo GDScript-first.
 - `dev` is source branch. `main` is generated publish branch.
 - Preserve suite model: files expose `test_*` methods. Unit suites extend `test.gd`. Scene suites extend `test_scene.gd` and open scenes with `await driver.screen(...)`.
+- Prefer locator-first actions and waited assertions for scene tests.
 - Prefer accessibility-first queries: role/name, visible text, label text, placeholder text.
 - Treat `get_by_node_name()` as escape hatch only.
 - Keep strict cardinality semantics aligned with Testing Library style.

@@ -29,6 +29,55 @@ func click() -> void:
 	await screen.click(target)
 
 
+func fill(text: String) -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for fill: %s" % description)
+		return
+
+	await screen.fill(target, text)
+
+
+func clear() -> void:
+	await fill("")
+
+
+func press(keycode: Key) -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for press: %s" % description)
+		return
+
+	await screen.press(target, keycode)
+
+
+func check() -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for check: %s" % description)
+		return
+
+	await screen.check(target)
+
+
+func uncheck() -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for uncheck: %s" % description)
+		return
+
+	await screen.uncheck(target)
+
+
+func select_option(option_text: String) -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for select_option: %s" % description)
+		return
+
+	await screen.select_option(target, option_text)
+
+
 func property(property_name: String):
 	return screen.property(self, property_name)
 
@@ -37,12 +86,66 @@ func text() -> String:
 	return screen.node_text(self)
 
 
+func value():
+	return screen.node_value(self)
+
+
 func expect_exists(message: String = "") -> void:
 	screen.expect_node(self, message if message != "" else "Expected locator to exist: %s" % description)
 
 
 func expect_text(expected: String, message: String = "") -> void:
 	screen.expect_text(self, expected, message)
+
+
+func to_exist(timeout_sec: float = 2.0) -> bool:
+	return await screen.wait_until(
+		func() -> bool:
+			return exists(),
+		timeout_sec,
+		1,
+		"Timed out waiting for locator to exist: %s" % description
+	)
+
+
+func to_have_text(expected: String, timeout_sec: float = 2.0) -> bool:
+	return await screen.wait_until(
+		func() -> bool:
+			return text() == expected,
+		timeout_sec,
+		1,
+		"Timed out waiting for text on %s expected=%s actual=%s" % [description, expected, text()]
+	)
+
+
+func to_have_value(expected, timeout_sec: float = 2.0) -> bool:
+	return await screen.wait_until(
+		func() -> bool:
+			return value() == expected,
+		timeout_sec,
+		1,
+		"Timed out waiting for value on %s expected=%s actual=%s" % [description, var_to_str(expected), var_to_str(value())]
+	)
+
+
+func to_be_visible(timeout_sec: float = 2.0) -> bool:
+	return await screen.wait_until(
+		func() -> bool:
+			return screen.is_visible(self),
+		timeout_sec,
+		1,
+		"Timed out waiting for %s to become visible" % description
+	)
+
+
+func to_be_enabled(timeout_sec: float = 2.0) -> bool:
+	return await screen.wait_until(
+		func() -> bool:
+			return screen.is_enabled(self),
+		timeout_sec,
+		1,
+		"Timed out waiting for %s to become enabled" % description
+	)
 
 
 func within() -> GodoteerLocator:

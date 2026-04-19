@@ -28,3 +28,13 @@ func test_expect_includes_variadic_details() -> void:
 		"Unexpected variadic failure message",
 		failures
 	)
+
+
+func test_expect_formats_dictionary_details() -> void:
+	set_failures_quiet(true)
+	expect(false, "expected=", {"hp": 10}, "actual=", {"hp": 5})
+	set_failures_quiet(false)
+
+	var failures := drain_failures()
+	expect(failures.size() == 1, "Expected one dictionary failure", failures)
+	expect(str(failures[0]).contains("expected="), "Formatted message should keep paired labels", failures)
