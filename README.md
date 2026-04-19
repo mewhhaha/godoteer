@@ -48,6 +48,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --dir res://tests --grep drag --junit user://artifacts/junit/results.xml
 ```
 
+Update visual baselines intentionally:
+
+```bash
+godot --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/visual_snapshot_test.gd --update-snapshots
+```
+
 Run whole test tree:
 
 ```bash
@@ -153,7 +160,10 @@ Useful scene actions:
 - `await locator.set_checked(bool)`
 - `await locator.select_option(option_text)`
 - `await locator.capture(file_name)`
+- `locator.expect_snapshot(file_name, options = {})`
 - `await screen.capture_camera(camera, file_name)`
+- `screen.expect_snapshot(file_name, options = {})`
+- `await screen.expect_camera_snapshot(camera, file_name, options = {})`
 - `screen.action_press(action_name, strength = 1.0)`
 - `screen.action_release(action_name)`
 - `await screen.action_tap(action_name, hold_frames = 1, strength = 1.0)`
@@ -198,6 +208,28 @@ Useful waited locator assertions:
 - `await locator.to_have_accessible_name(text)`
 - `await locator.to_have_accessible_description(text)`
 - `await locator.to_have_accessibility_role(role)`
+
+Collection queries now return live `GodoteerLocatorList`, not raw arrays:
+
+```gdscript
+var buttons := screen.get_all_by_role("button", {"name": "Choice"})
+await buttons.to_have_count(2)
+await buttons.nth(1).click()
+for button in buttons.all():
+	expect(button.exists(), "button should still resolve")
+```
+
+Collection helpers:
+- `count()`
+- `is_empty()`
+- `all()`
+- `nth(index)`
+- `first()`
+- `last()`
+- `await to_have_count(expected, timeout_sec = 2.0)`
+- `await to_be_empty(timeout_sec = 2.0)`
+
+`get_all_*`, `query_all_*`, and `find_all_*` no longer return raw `Array`. Use `.all()` when manual iteration needs array semantics.
 
 Useful timing helpers:
 - `await screen.wait_frames(count)`
@@ -244,4 +276,17 @@ Accessibility inspection helpers:
 
 `rid_valid` and `has_accessibility_element()` reflect native accessibility element availability. They may differ between headless and windowed runs even when query behavior stays the same.
 
-`locator.capture(file_name)` now saves cropped PNGs for visible `Control` targets in windowed runs. `screen.screenshot(file_name)` stays full-screen. `screen.capture_camera(camera, file_name)` captures from a specific `Camera2D` or `Camera3D`.
+`locator.capture(file_name)` saves cropped PNGs for visible `Control` targets in windowed runs. `screen.screenshot(file_name)` stays full-screen. `screen.capture_camera(camera, file_name)` captures from a specific `Camera2D` or `Camera3D`.
+
+Visual assertions layer on top of capture:
+- baselines live under `sample_project/tests/__snapshots__/`
+- normal runs fail on missing or mismatched baseline PNGs
+- `--update-snapshots` creates or refreshes baselines intentionally
+- mismatches write `actual.png` and `diff.png` under `user://artifacts/visual_failures/`
+- matching is exact-pixel by default, with optional `max_diff_pixels`
+
+Scene test failures also write trace bundles:
+- `user://artifacts/traces/<suite>/<test>/trace.jsonl`
+- `user://artifacts/traces/<suite>/<test>/summary.txt`
+- failure output includes `Failure trace: ...`
+- traces write on failure only, not on pass

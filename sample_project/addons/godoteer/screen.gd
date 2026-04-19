@@ -2,6 +2,7 @@ extends RefCounted
 class_name GodoteerScreen
 
 const GodoteerLocator = preload("locator.gd")
+const GodoteerLocatorList = preload("locator_list.gd")
 
 
 class SignalProbe:
@@ -29,6 +30,10 @@ var tree: SceneTree
 var app_root: Node
 var failure_sink: Object
 var artifacts_dir := "user://artifacts"
+var active_suite_path := ""
+var active_test_name := ""
+var update_snapshots := false
+var trace_recorder: Object
 var last_mouse_position := Vector2.ZERO
 var pressed_actions: Dictionary = {}
 var pressed_keys: Dictionary = {}
@@ -37,11 +42,24 @@ var joy_axis_values: Dictionary = {}
 var active_touches: Dictionary = {}
 
 
-func _init(scene_tree: SceneTree, root_node: Node, sink: Object, artifacts_path: String = "user://artifacts") -> void:
+func _init(
+	scene_tree: SceneTree,
+	root_node: Node,
+	sink: Object,
+	artifacts_path: String = "user://artifacts",
+	suite_path: String = "",
+	test_name: String = "",
+	should_update_snapshots: bool = false,
+	recorder: Object = null
+) -> void:
 	tree = scene_tree
 	app_root = root_node
 	failure_sink = sink
 	artifacts_dir = artifacts_path.trim_suffix("/")
+	active_suite_path = suite_path
+	active_test_name = test_name
+	update_snapshots = should_update_snapshots
+	trace_recorder = recorder
 
 
 func wait_frames(count: int = 1) -> void:
@@ -59,43 +77,106 @@ func wait_physics_frames(count: int = 1) -> void:
 
 
 func wait_until(predicate: Callable, timeout_sec: float = 2.0, step_frames: int = 1, message: String = "Condition timed out") -> bool:
+	_trace_event("wait_started", {
+		"message": message,
+		"timeout_sec": timeout_sec,
+		"step_frames": step_frames,
+		"wait_kind": "wait_until",
+	})
 	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
 	while Time.get_ticks_msec() <= deadline:
 		if predicate.call():
+			_trace_event("wait_finished", {
+				"message": message,
+				"timeout_sec": timeout_sec,
+				"wait_kind": "wait_until",
+			})
 			return true
 		await wait_frames(step_frames)
 
+	_trace_event("wait_timed_out", {
+		"message": message,
+		"timeout_sec": timeout_sec,
+		"wait_kind": "wait_until",
+	})
 	_record_failure(message)
 	return false
 
 
 func wait_until_frames(predicate: Callable, max_frames := 120, message: String = "Condition timed out") -> bool:
+	_trace_event("wait_started", {
+		"message": message,
+		"max_frames": max_frames,
+		"wait_kind": "wait_until_frames",
+	})
 	if predicate.call():
+		_trace_event("wait_finished", {
+			"message": message,
+			"max_frames": max_frames,
+			"wait_kind": "wait_until_frames",
+		})
 		return true
 
 	for _i in range(max(int(max_frames), 0)):
 		await wait_frames(1)
 		if predicate.call():
+			_trace_event("wait_finished", {
+				"message": message,
+				"max_frames": max_frames,
+				"wait_kind": "wait_until_frames",
+			})
 			return true
 
+	_trace_event("wait_timed_out", {
+		"message": message,
+		"max_frames": max_frames,
+		"wait_kind": "wait_until_frames",
+	})
 	_record_failure(message)
 	return false
 
 
 func wait_until_physics(predicate: Callable, max_frames := 120, message: String = "Condition timed out") -> bool:
+	_trace_event("wait_started", {
+		"message": message,
+		"max_frames": max_frames,
+		"wait_kind": "wait_until_physics",
+	})
 	if predicate.call():
+		_trace_event("wait_finished", {
+			"message": message,
+			"max_frames": max_frames,
+			"wait_kind": "wait_until_physics",
+		})
 		return true
 
 	for _i in range(max(int(max_frames), 0)):
 		await wait_physics_frames(1)
 		if predicate.call():
+			_trace_event("wait_finished", {
+				"message": message,
+				"max_frames": max_frames,
+				"wait_kind": "wait_until_physics",
+			})
 			return true
 
+	_trace_event("wait_timed_out", {
+		"message": message,
+		"max_frames": max_frames,
+		"wait_kind": "wait_until_physics",
+	})
 	_record_failure(message)
 	return false
 
 
 func wait_for_signal(target: Variant, signal_name: String, timeout_sec: float = 2.0, message: String = "") -> bool:
+	_trace_event("wait_started", {
+		"message": message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"timeout_sec": timeout_sec,
+		"wait_kind": "wait_for_signal",
+	})
 	var target_node := node(target)
 	if target_node == null:
 		_record_failure("wait_for_signal() could not resolve target: %s" % str(target))
@@ -121,6 +202,13 @@ func wait_for_signal(target: Variant, signal_name: String, timeout_sec: float = 
 		timeout_message
 	)
 	_disconnect_signal_probe(target_node, signal_name, probe)
+	_trace_event("wait_finished" if received else "wait_timed_out", {
+		"message": timeout_message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"timeout_sec": timeout_sec,
+		"wait_kind": "wait_for_signal",
+	})
 	return received
 
 
@@ -131,6 +219,14 @@ func next_signal(
 	physics := false,
 	message: String = ""
 ) -> Dictionary:
+	_trace_event("wait_started", {
+		"message": message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": max_frames,
+		"wait_kind": "next_signal",
+		"physics": physics,
+	})
 	var target_node := node(target)
 	if target_node == null:
 		_record_failure("next_signal() could not resolve target: %s" % str(target))
@@ -165,6 +261,15 @@ func next_signal(
 		)
 
 	_disconnect_signal_probe(target_node, signal_name, probe)
+	_trace_event("wait_finished" if received else "wait_timed_out", {
+		"message": wait_message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": max_frames,
+		"wait_kind": "next_signal",
+		"physics": physics,
+		"args": probe.args.duplicate(),
+	})
 	return {
 		"fired": received,
 		"args": probe.args.duplicate(),
@@ -180,54 +285,75 @@ func resume_scene() -> void:
 
 
 func set_time_scale(scale: float) -> void:
+	_trace_action_started("set_time_scale", {"scale": scale})
 	if scale <= 0.0:
 		_record_failure("set_time_scale() requires scale > 0.0: %s" % scale)
 		return
 	Engine.time_scale = scale
+	_trace_action_finished("set_time_scale", {"scale": scale})
 
 
 func action_press(action_name: String, strength: float = 1.0) -> void:
+	_trace_action_started("action_press", {"input_action": action_name, "strength": strength})
 	if not _ensure_action_exists("action_press", action_name):
 		return
 
 	Input.action_press(action_name, strength)
 	pressed_actions[action_name] = true
+	_trace_action_finished("action_press", {"input_action": action_name, "strength": strength})
 
 
 func action_release(action_name: String) -> void:
+	_trace_action_started("action_release", {"input_action": action_name})
 	if not _ensure_action_exists("action_release", action_name):
 		return
 
 	Input.action_release(action_name)
 	pressed_actions.erase(action_name)
+	_trace_action_finished("action_release", {"input_action": action_name})
 
 
 func action_tap(action_name: String, hold_frames: int = 1, strength: float = 1.0) -> void:
+	_trace_action_started("action_tap", {
+		"input_action": action_name,
+		"hold_frames": hold_frames,
+		"strength": strength,
+	})
 	if not _ensure_action_exists("action_tap", action_name):
 		return
 
 	action_press(action_name, strength)
 	await wait_physics_frames(max(hold_frames, 1))
 	action_release(action_name)
+	_trace_action_finished("action_tap", {
+		"input_action": action_name,
+		"hold_frames": hold_frames,
+		"strength": strength,
+	})
 
 
 func key_press(keycode: Key) -> void:
+	_trace_action_started("key_press", {"keycode": keycode})
 	var press := InputEventKey.new()
 	press.keycode = keycode
 	press.pressed = true
 	Input.parse_input_event(press)
 	pressed_keys[keycode] = true
+	_trace_action_finished("key_press", {"keycode": keycode})
 
 
 func key_release(keycode: Key) -> void:
+	_trace_action_started("key_release", {"keycode": keycode})
 	var release := InputEventKey.new()
 	release.keycode = keycode
 	release.pressed = false
 	Input.parse_input_event(release)
 	pressed_keys.erase(keycode)
+	_trace_action_finished("key_release", {"keycode": keycode})
 
 
 func joy_button_press(button, device := 0) -> void:
+	_trace_action_started("joy_button_press", {"button": int(button), "device": int(device)})
 	var event := InputEventJoypadButton.new()
 	event.device = int(device)
 	event.button_index = int(button)
@@ -236,9 +362,11 @@ func joy_button_press(button, device := 0) -> void:
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
 	pressed_joy_buttons[_joy_input_key(int(device), int(button))] = true
+	_trace_action_finished("joy_button_press", {"button": int(button), "device": int(device)})
 
 
 func joy_button_release(button, device := 0) -> void:
+	_trace_action_started("joy_button_release", {"button": int(button), "device": int(device)})
 	var event := InputEventJoypadButton.new()
 	event.device = int(device)
 	event.button_index = int(button)
@@ -247,16 +375,20 @@ func joy_button_release(button, device := 0) -> void:
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
 	pressed_joy_buttons.erase(_joy_input_key(int(device), int(button)))
+	_trace_action_finished("joy_button_release", {"button": int(button), "device": int(device)})
 
 
 func joy_button_tap(button, hold_frames := 1, device := 0) -> void:
+	_trace_action_started("joy_button_tap", {"button": int(button), "device": int(device), "hold_frames": int(hold_frames)})
 	joy_button_press(button, device)
 	await wait_physics_frames(max(int(hold_frames), 1))
 	joy_button_release(button, device)
 	await wait_frames(1)
+	_trace_action_finished("joy_button_tap", {"button": int(button), "device": int(device), "hold_frames": int(hold_frames)})
 
 
 func joy_axis_set(axis, value: float, device := 0) -> void:
+	_trace_action_started("joy_axis_set", {"axis": int(axis), "value": value, "device": int(device)})
 	var clamped_value := clampf(value, -1.0, 1.0)
 	var event := InputEventJoypadMotion.new()
 	event.device = int(device)
@@ -265,11 +397,14 @@ func joy_axis_set(axis, value: float, device := 0) -> void:
 	Input.parse_input_event(event)
 	Input.flush_buffered_events()
 	joy_axis_values[_joy_input_key(int(device), int(axis))] = clamped_value
+	_trace_action_finished("joy_axis_set", {"axis": int(axis), "value": clamped_value, "device": int(device)})
 
 
 func joy_axis_reset(axis, device := 0) -> void:
+	_trace_action_started("joy_axis_reset", {"axis": int(axis), "device": int(device)})
 	joy_axis_set(axis, 0.0, device)
 	joy_axis_values.erase(_joy_input_key(int(device), int(axis)))
+	_trace_action_finished("joy_axis_reset", {"axis": int(axis), "device": int(device)})
 
 
 func node(path_or_node: Variant) -> Node:
@@ -351,6 +486,7 @@ func is_enabled(path_or_node: Variant) -> bool:
 
 
 func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
+	_trace_action_started("click", {"target": str(target), "button": button})
 	var target_node := node(target)
 	if not _ensure_control_enabled("click", target_node, target):
 		return
@@ -378,15 +514,18 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 			target_node.grab_click_focus()
 			target_node.set_pressed(not target_node.button_pressed)
 			await wait_frames(1)
+		_trace_action_finished("click", {"target": str(target), "button": button})
 		return
 
 	if target_node is BaseButton and not pressed_fired:
 		target_node.grab_click_focus()
 		target_node.pressed.emit()
 		await wait_frames(1)
+	_trace_action_finished("click", {"target": str(target), "button": button})
 
 
 func hover(target: Variant) -> void:
+	_trace_action_started("hover", {"target": str(target)})
 	var target_node := node(target)
 	var hover_probe := _connect_signal_probe(target_node, "mouse_entered")
 	var position := _resolve_position(target)
@@ -400,31 +539,37 @@ func hover(target: Variant) -> void:
 	if target_node is Control and not _disconnect_signal_probe(target_node, "mouse_entered", hover_probe):
 		target_node.mouse_entered.emit()
 		await wait_frames(1)
+	_trace_action_finished("hover", {"target": str(target)})
 
 
 func focus(target: Variant) -> void:
+	_trace_action_started("focus", {"target": str(target)})
 	var target_node := node(target)
 	if target_node is Control:
 		if not _ensure_control_enabled("focus", target_node, target):
 			return
 		target_node.grab_focus()
 		await wait_frames(1)
+		_trace_action_finished("focus", {"target": str(target)})
 		return
 
 	_record_failure("focus() supports Control only: %s" % str(target))
 
 
 func blur(target: Variant) -> void:
+	_trace_action_started("blur", {"target": str(target)})
 	var target_node := node(target)
 	if target_node is Control:
 		target_node.release_focus()
 		await wait_frames(1)
+		_trace_action_finished("blur", {"target": str(target)})
 		return
 
 	_record_failure("blur() supports Control only: %s" % str(target))
 
 
 func fill(target: Variant, text: String) -> void:
+	_trace_action_started("fill", {"target": str(target), "text": text})
 	var target_node := node(target)
 	if target_node is LineEdit:
 		if not _ensure_control_enabled("fill", target_node, target):
@@ -435,6 +580,7 @@ func fill(target: Variant, text: String) -> void:
 		target_node.text = text
 		target_node.text_changed.emit(text)
 		await wait_frames(1)
+		_trace_action_finished("fill", {"target": str(target), "text": text})
 		return
 
 	if target_node is TextEdit:
@@ -446,16 +592,20 @@ func fill(target: Variant, text: String) -> void:
 		target_node.text = text
 		target_node.text_changed.emit()
 		await wait_frames(1)
+		_trace_action_finished("fill", {"target": str(target), "text": text})
 		return
 
 	_record_failure("fill() supports LineEdit and TextEdit only: %s" % str(target))
 
 
 func clear(target: Variant) -> void:
+	_trace_action_started("clear", {"target": str(target)})
 	await fill(target, "")
+	_trace_action_finished("clear", {"target": str(target)})
 
 
 func press(target: Variant, keycode: Key) -> void:
+	_trace_action_started("press", {"target": str(target), "keycode": keycode})
 	var target_node := node(target)
 	var submitted_probe := _connect_signal_probe(target_node, "text_submitted")
 	if target_node is Control:
@@ -471,9 +621,16 @@ func press(target: Variant, keycode: Key) -> void:
 	if target_node is LineEdit and not submitted and (keycode == KEY_ENTER or keycode == KEY_KP_ENTER):
 		target_node.text_submitted.emit(target_node.text)
 		await wait_frames(1)
+	_trace_action_finished("press", {"target": str(target), "keycode": keycode})
 
 
 func drag_to(source: Variant, target_or_position: Variant, duration_sec: float = 0.2, steps: int = 12) -> void:
+	_trace_action_started("drag_to", {
+		"source": str(source),
+		"target": str(target_or_position),
+		"duration_sec": duration_sec,
+		"steps": steps,
+	})
 	var source_node := node(source)
 	var target_node := node(target_or_position)
 	var from_position := _resolve_position(source)
@@ -517,40 +674,51 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 	if target_node is Control and not _disconnect_signal_probe(target_node, "gui_input", target_probe):
 		target_node.gui_input.emit(release_event)
 		await wait_frames(1)
+	_trace_action_finished("drag_to", {
+		"source": str(source),
+		"target": str(target_or_position),
+	})
 
 
 func check(target: Variant) -> void:
+	_trace_action_started("check", {"target": str(target)})
 	var target_node := node(target)
 	if target_node is CheckBox or target_node is CheckButton:
 		if not _ensure_control_enabled("check", target_node, target):
 			return
 		if not target_node.button_pressed:
 			await click(target)
+		_trace_action_finished("check", {"target": str(target)})
 		return
 
 	_record_failure("check() supports CheckBox and CheckButton only: %s" % str(target))
 
 
 func uncheck(target: Variant) -> void:
+	_trace_action_started("uncheck", {"target": str(target)})
 	var target_node := node(target)
 	if target_node is CheckBox or target_node is CheckButton:
 		if not _ensure_control_enabled("uncheck", target_node, target):
 			return
 		if target_node.button_pressed:
 			await click(target)
+		_trace_action_finished("uncheck", {"target": str(target)})
 		return
 
 	_record_failure("uncheck() supports CheckBox and CheckButton only: %s" % str(target))
 
 
 func set_checked(target: Variant, checked: bool) -> void:
+	_trace_action_started("set_checked", {"target": str(target), "checked": checked})
 	if checked:
 		await check(target)
 	else:
 		await uncheck(target)
+	_trace_action_finished("set_checked", {"target": str(target), "checked": checked})
 
 
 func select_option(target: Variant, option_text: String) -> void:
+	_trace_action_started("select_option", {"target": str(target), "option_text": option_text})
 	var target_node := node(target)
 	if target_node is OptionButton:
 		if not _ensure_control_enabled("select_option", target_node, target):
@@ -581,12 +749,14 @@ func select_option(target: Variant, option_text: String) -> void:
 		var activated := popup.activate_item_by_event(activate_event)
 		await wait_frames(1)
 		if option_button.selected == option_index:
+			_trace_action_finished("select_option", {"target": str(target), "option_text": option_text})
 			return
 
 		if not activated:
 			popup.index_pressed.emit(option_index)
 			await wait_frames(1)
 		if option_button.selected == option_index:
+			_trace_action_finished("select_option", {"target": str(target), "option_text": option_text})
 			return
 
 		_record_failure("select_option() could not activate option %s on %s previous=%s actual=%s" % [
@@ -601,6 +771,7 @@ func select_option(target: Variant, option_text: String) -> void:
 
 
 func mouse_move_relative(delta: Vector2) -> void:
+	_trace_action_started("mouse_move_relative", {"delta": delta})
 	var next_position := last_mouse_position + delta
 	var event := InputEventMouseMotion.new()
 	event.position = next_position
@@ -609,6 +780,7 @@ func mouse_move_relative(delta: Vector2) -> void:
 	event.screen_relative = delta
 	Input.parse_input_event(event)
 	last_mouse_position = next_position
+	_trace_action_finished("mouse_move_relative", {"delta": delta})
 
 
 func mouse_move(position: Vector2) -> void:
@@ -630,6 +802,11 @@ func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: b
 
 
 func mouse_wheel(vertical_steps: int, horizontal_steps := 0, target: Variant = null) -> void:
+	_trace_action_started("mouse_wheel", {
+		"vertical_steps": vertical_steps,
+		"horizontal_steps": horizontal_steps,
+		"target": str(target),
+	})
 	var position := _resolve_optional_position(target)
 	for _step in range(abs(vertical_steps)):
 		var button := MOUSE_BUTTON_WHEEL_UP if vertical_steps > 0 else MOUSE_BUTTON_WHEEL_DOWN
@@ -639,6 +816,11 @@ func mouse_wheel(vertical_steps: int, horizontal_steps := 0, target: Variant = n
 		var button := MOUSE_BUTTON_WHEEL_RIGHT if horizontal_steps > 0 else MOUSE_BUTTON_WHEEL_LEFT
 		mouse_button(position, button, true)
 		await wait_frames(1)
+	_trace_action_finished("mouse_wheel", {
+		"vertical_steps": vertical_steps,
+		"horizontal_steps": horizontal_steps,
+		"target": str(target),
+	})
 
 
 func move_mouse_between(
@@ -647,11 +829,21 @@ func move_mouse_between(
 	duration_sec: float = 0.2,
 	steps: int = 12
 ) -> void:
+	_trace_action_started("move_mouse_between", {
+		"from": from_position,
+		"to": to_position,
+		"duration_sec": duration_sec,
+		"steps": steps,
+	})
 	mouse_move(from_position)
 
 	var distance := from_position.distance_to(to_position)
 	if distance <= 0.0:
 		await wait_frames(1)
+		_trace_action_finished("move_mouse_between", {
+			"from": from_position,
+			"to": to_position,
+		})
 		return
 
 	var safe_steps: int = max(1, steps)
@@ -663,6 +855,10 @@ func move_mouse_between(
 		mouse_move(from_position.lerp(to_position, weight))
 		if delay_sec > 0.0:
 			await tree.create_timer(delay_sec).timeout
+	_trace_action_finished("move_mouse_between", {
+		"from": from_position,
+		"to": to_position,
+	})
 
 
 func move_mouse_to(
@@ -674,22 +870,27 @@ func move_mouse_to(
 
 
 func key_tap(keycode: Key, hold_frames := 1) -> void:
+	_trace_action_started("key_tap", {"keycode": keycode, "hold_frames": int(hold_frames)})
 	key_press(keycode)
 	await wait_frames(max(int(hold_frames), 1))
 	key_release(keycode)
 	await wait_frames(1)
+	_trace_action_finished("key_tap", {"keycode": keycode, "hold_frames": int(hold_frames)})
 
 
 func touch_press(position: Vector2, index := 0) -> void:
+	_trace_action_started("touch_press", {"position": position, "index": int(index)})
 	var event := InputEventScreenTouch.new()
 	event.index = int(index)
 	event.position = position
 	event.pressed = true
 	Input.parse_input_event(event)
 	active_touches[int(index)] = position
+	_trace_action_finished("touch_press", {"position": position, "index": int(index)})
 
 
 func touch_move(position: Vector2, index := 0) -> void:
+	_trace_action_started("touch_move", {"position": position, "index": int(index)})
 	var touch_index := int(index)
 	var previous_position: Vector2 = active_touches.get(touch_index, position)
 	var event := InputEventScreenDrag.new()
@@ -699,25 +900,37 @@ func touch_move(position: Vector2, index := 0) -> void:
 	event.screen_relative = event.relative
 	Input.parse_input_event(event)
 	active_touches[touch_index] = position
+	_trace_action_finished("touch_move", {"position": position, "index": int(index)})
 
 
 func touch_release(position: Vector2, index := 0) -> void:
+	_trace_action_started("touch_release", {"position": position, "index": int(index)})
 	var event := InputEventScreenTouch.new()
 	event.index = int(index)
 	event.position = position
 	event.pressed = false
 	Input.parse_input_event(event)
 	active_touches.erase(int(index))
+	_trace_action_finished("touch_release", {"position": position, "index": int(index)})
 
 
 func touch_tap(position: Vector2, index := 0, hold_frames := 1) -> void:
+	_trace_action_started("touch_tap", {"position": position, "index": int(index), "hold_frames": int(hold_frames)})
 	touch_press(position, index)
 	await wait_frames(max(int(hold_frames), 1))
 	touch_release(position, index)
 	await wait_frames(1)
+	_trace_action_finished("touch_tap", {"position": position, "index": int(index), "hold_frames": int(hold_frames)})
 
 
 func touch_drag(from: Vector2, to: Vector2, index := 0, duration_sec := 0.2, steps := 12) -> void:
+	_trace_action_started("touch_drag", {
+		"from": from,
+		"to": to,
+		"index": int(index),
+		"duration_sec": float(duration_sec),
+		"steps": int(steps),
+	})
 	touch_press(from, index)
 	var safe_steps: int = max(int(steps), 1)
 	var safe_duration: float = max(float(duration_sec), 0.0)
@@ -731,6 +944,11 @@ func touch_drag(from: Vector2, to: Vector2, index := 0, duration_sec := 0.2, ste
 			await wait_frames(1)
 	touch_release(to, index)
 	await wait_frames(1)
+	_trace_action_finished("touch_drag", {
+		"from": from,
+		"to": to,
+		"index": int(index),
+	})
 
 
 func touch_pinch(
@@ -743,6 +961,14 @@ func touch_pinch(
 	index_a := 0,
 	index_b := 1
 ) -> void:
+	_trace_action_started("touch_pinch", {
+		"start_a": start_a,
+		"start_b": start_b,
+		"end_a": end_a,
+		"end_b": end_b,
+		"duration_sec": float(duration_sec),
+		"steps": int(steps),
+	})
 	touch_press(start_a, index_a)
 	touch_press(start_b, index_b)
 	var safe_steps: int = max(int(steps), 1)
@@ -759,6 +985,12 @@ func touch_pinch(
 	touch_release(end_a, index_a)
 	touch_release(end_b, index_b)
 	await wait_frames(1)
+	_trace_action_finished("touch_pinch", {
+		"start_a": start_a,
+		"start_b": start_b,
+		"end_a": end_a,
+		"end_b": end_b,
+	})
 
 
 func release_all_actions() -> void:
@@ -786,80 +1018,41 @@ func release_all_inputs() -> void:
 
 
 func screenshot(file_name: String = "screenshot.png") -> String:
-	if not can_screenshot():
-		_record_failure("Screenshots unavailable with current renderer/window mode")
-		return ""
-
-	var image := _viewport_image()
+	_trace_event("artifact_started", {
+		"message": "screenshot(%s)" % file_name,
+		"artifact_kind": "screenshot",
+	})
+	var image := _capture_screen_image()
 	if image == null:
-		_record_failure("Could not read viewport image for screenshot")
 		return ""
 
 	return _save_png_image(image, file_name)
 
 
 func capture_locator(target: Variant, file_name: String = "locator.png") -> String:
-	if not can_screenshot():
-		_record_failure("Screenshots unavailable with current renderer/window mode")
-		return ""
-
-	var target_node := node(target)
-	if not target_node is Control:
-		_record_failure("capture_locator() supports Control only: %s" % str(target))
-		return ""
-
-	var control: Control = target_node
-	if not control.is_visible_in_tree():
-		_record_failure("capture_locator() target is not visible: %s" % str(target))
-		return ""
-
-	var image := _viewport_image()
+	_trace_event("artifact_started", {
+		"message": "capture_locator(%s, %s)" % [str(target), file_name],
+		"artifact_kind": "locator_capture",
+		"target": str(target),
+	})
+	var image := _capture_locator_image(target)
 	if image == null:
-		_record_failure("Could not read viewport image for locator capture")
 		return ""
 
-	var crop_rect := _locator_capture_rect(control, Vector2i(image.get_width(), image.get_height()))
-	if crop_rect.size.x <= 0 or crop_rect.size.y <= 0:
-		_record_failure("capture_locator() invalid crop rect for %s: %s" % [str(target), str(crop_rect)])
-		return ""
-
-	var cropped := image.get_region(crop_rect)
-	if cropped == null or cropped.is_empty():
-		_record_failure("capture_locator() failed to crop image for %s" % str(target))
-		return ""
-
-	return _save_png_image(cropped, file_name)
+	return _save_png_image(image, file_name)
 
 
 func capture_camera(camera_target: Variant, file_name: String = "camera.png") -> String:
-	if DisplayServer.get_name() == "headless":
-		_record_failure("Camera screenshots unavailable with current renderer/window mode")
-		return ""
-
-	var camera_node := node(camera_target)
-	if not (camera_node is Camera2D or camera_node is Camera3D):
-		_record_failure("capture_camera() supports Camera2D and Camera3D only: %s" % str(camera_target))
-		return ""
-
-	var viewport := camera_node.get_viewport()
-	if viewport == null or viewport.get_texture() == null:
-		_record_failure("capture_camera() could not resolve viewport texture for %s" % str(camera_target))
-		return ""
-
-	var previous_camera: Variant = _active_camera_for_viewport(viewport, camera_node)
-	if previous_camera != camera_node:
-		camera_node.make_current()
-		await wait_frames(2)
-
-	var image := _viewport_image_from(viewport)
+	_trace_event("artifact_started", {
+		"message": "capture_camera(%s, %s)" % [str(camera_target), file_name],
+		"artifact_kind": "camera_capture",
+		"target": str(camera_target),
+	})
+	var image := await _capture_camera_image(camera_target)
 	if image == null:
-		_restore_camera(previous_camera, camera_node)
-		_record_failure("Could not read viewport image for camera capture")
 		return ""
 
-	var save_path := _save_png_image(image, file_name)
-	_restore_camera(previous_camera, camera_node)
-	return save_path
+	return _save_png_image(image, file_name)
 
 
 func can_screenshot() -> bool:
@@ -867,6 +1060,41 @@ func can_screenshot() -> bool:
 		return false
 
 	return tree.root.get_viewport().get_texture() != null
+
+
+func expect_snapshot(file_name: String, options: Dictionary = {}) -> bool:
+	_trace_event("artifact_started", {
+		"message": "expect_snapshot(%s)" % file_name,
+		"artifact_kind": "snapshot_assertion",
+	})
+	var image := _capture_screen_image()
+	if image == null:
+		return false
+	return _assert_snapshot_image(image, file_name, options, "screen")
+
+
+func expect_locator_snapshot(target: Variant, file_name: String, options: Dictionary = {}) -> bool:
+	_trace_event("artifact_started", {
+		"message": "expect_locator_snapshot(%s, %s)" % [str(target), file_name],
+		"artifact_kind": "snapshot_assertion",
+		"target": str(target),
+	})
+	var image := _capture_locator_image(target)
+	if image == null:
+		return false
+	return _assert_snapshot_image(image, file_name, options, "locator(%s)" % str(target))
+
+
+func expect_camera_snapshot(camera_target: Variant, file_name: String, options: Dictionary = {}) -> bool:
+	_trace_event("artifact_started", {
+		"message": "expect_camera_snapshot(%s, %s)" % [str(camera_target), file_name],
+		"artifact_kind": "snapshot_assertion",
+		"target": str(camera_target),
+	})
+	var image := await _capture_camera_image(camera_target)
+	if image == null:
+		return false
+	return _assert_snapshot_image(image, file_name, options, "camera(%s)" % str(camera_target))
 
 
 func screen_reader_supported() -> bool:
@@ -956,15 +1184,15 @@ func find_by_role(role: String, options: Dictionary = {}, root_target: Variant =
 	return await _find_single_locator(_build_role_query("find_by_role", role, options, root_target))
 
 
-func get_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> Array:
+func get_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
 	return _get_all_locators(_build_role_query("get_all_by_role", role, options, root_target))
 
 
-func query_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> Array:
+func query_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
 	return _query_all_locators(_build_role_query("query_all_by_role", role, options, root_target))
 
 
-func find_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> Array:
+func find_all_by_role(role: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
 	return await _find_all_locators(_build_role_query("find_all_by_role", role, options, root_target))
 
 
@@ -980,6 +1208,18 @@ func find_by_text(text: String, options: Dictionary = {}, root_target: Variant =
 	return await _find_single_locator(_build_text_query("find_by_text", "text", text, options, root_target))
 
 
+func get_all_by_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _get_all_locators(_build_text_query("get_all_by_text", "text", text, options, root_target))
+
+
+func query_all_by_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _query_all_locators(_build_text_query("query_all_by_text", "text", text, options, root_target))
+
+
+func find_all_by_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return await _find_all_locators(_build_text_query("find_all_by_text", "text", text, options, root_target))
+
+
 func get_by_label_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocator:
 	return _get_single_locator(_build_text_query("get_by_label_text", "label_text", text, options, root_target))
 
@@ -990,6 +1230,18 @@ func query_by_label_text(text: String, options: Dictionary = {}, root_target: Va
 
 func find_by_label_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocator:
 	return await _find_single_locator(_build_text_query("find_by_label_text", "label_text", text, options, root_target))
+
+
+func get_all_by_label_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _get_all_locators(_build_text_query("get_all_by_label_text", "label_text", text, options, root_target))
+
+
+func query_all_by_label_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _query_all_locators(_build_text_query("query_all_by_label_text", "label_text", text, options, root_target))
+
+
+func find_all_by_label_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return await _find_all_locators(_build_text_query("find_all_by_label_text", "label_text", text, options, root_target))
 
 
 func get_by_placeholder_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocator:
@@ -1004,6 +1256,18 @@ func find_by_placeholder_text(text: String, options: Dictionary = {}, root_targe
 	return await _find_single_locator(_build_text_query("find_by_placeholder_text", "placeholder_text", text, options, root_target))
 
 
+func get_all_by_placeholder_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _get_all_locators(_build_text_query("get_all_by_placeholder_text", "placeholder_text", text, options, root_target))
+
+
+func query_all_by_placeholder_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return _query_all_locators(_build_text_query("query_all_by_placeholder_text", "placeholder_text", text, options, root_target))
+
+
+func find_all_by_placeholder_text(text: String, options: Dictionary = {}, root_target: Variant = null) -> GodoteerLocatorList:
+	return await _find_all_locators(_build_text_query("find_all_by_placeholder_text", "placeholder_text", text, options, root_target))
+
+
 func get_by_node_name(name: String, root_target: Variant = null) -> GodoteerLocator:
 	return _get_single_locator(_build_node_name_query("get_by_node_name", name, root_target))
 
@@ -1012,11 +1276,50 @@ func query_by_node_name(name: String, root_target: Variant = null) -> GodoteerLo
 	return _query_single_locator(_build_node_name_query("query_by_node_name", name, root_target))
 
 
-func resolve_query(query: Dictionary) -> Node:
-	if str(query.get("kind", "")) != "target":
-		return null
+func get_all_by_node_name(name: String, root_target: Variant = null) -> GodoteerLocatorList:
+	return _get_all_locators(_build_node_name_query("get_all_by_node_name", name, root_target))
 
-	return node(query.get("value", null))
+
+func query_all_by_node_name(name: String, root_target: Variant = null) -> GodoteerLocatorList:
+	return _query_all_locators(_build_node_name_query("query_all_by_node_name", name, root_target))
+
+
+func find_all_by_node_name(name: String, root_target: Variant = null) -> GodoteerLocatorList:
+	return await _find_all_locators(_build_node_name_query("find_all_by_node_name", name, root_target))
+
+
+func resolve_query(query: Dictionary) -> Node:
+	match str(query.get("kind", "")):
+		"target":
+			return node(query.get("value", null))
+		"collection_position":
+			return _resolve_collection_position(query)
+		_:
+			return null
+
+
+func resolve_query_nodes(query: Dictionary) -> Array:
+	return _resolve_matches(query)
+
+
+func describe_missing_query(query: Dictionary, action_name: String = "", fallback_description: String = "locator") -> String:
+	var prefix := "%s() " % action_name if action_name != "" else ""
+	if str(query.get("kind", "")) == "collection_position":
+		var collection_query: Dictionary = query.get("query", {})
+		var matches := _resolve_matches(collection_query)
+		var collection_label := str(collection_query.get("label", fallback_description))
+		var mode := str(query.get("mode", "nth"))
+		if matches.is_empty():
+			return "%scollection is empty: %s" % [prefix, collection_label]
+		if mode == "nth":
+			return "%starget index %d out of range for %s current_count=%d" % [
+				prefix,
+				int(query.get("index", -1)),
+				collection_label,
+				matches.size(),
+			]
+		return "%scollection is empty: %s" % [prefix, collection_label]
+	return "%slocator not found: %s" % [prefix, fallback_description]
 
 
 func expect_node(path_or_node: Variant, message: String = "") -> void:
@@ -1049,6 +1352,10 @@ func expect_text(path_or_node: Variant, expected: String, message: String = "") 
 
 func record_failure(message: String) -> void:
 	_record_failure(message)
+
+
+func trace_event(kind: String, details: Dictionary = {}) -> void:
+	_trace_event(kind, details)
 
 
 func _has_property(target: Object, property_name: String) -> bool:
@@ -1121,64 +1428,91 @@ func _normalize_query_options(options: Dictionary) -> Dictionary:
 
 
 func _get_single_locator(query: Dictionary) -> GodoteerLocator:
+	_trace_query_started(query)
 	var matches := _resolve_matches(query)
 	if matches.is_empty():
+		_trace_query_failed(query, 0)
 		_record_failure("Expected exactly one match for %s, found none" % query["label"])
 		return null
 	if matches.size() > 1:
+		_trace_query_failed(query, matches.size())
 		_record_failure("Expected exactly one match for %s, found %d" % [query["label"], matches.size()])
 		return null
+	_trace_query_resolved(query, matches.size())
 	return _target_locator(matches[0], str(query["label"]))
 
 
 func _query_single_locator(query: Dictionary) -> GodoteerLocator:
+	_trace_query_started(query)
 	var matches := _resolve_matches(query)
 	if matches.is_empty():
+		_trace_query_resolved(query, 0)
 		return null
 	if matches.size() > 1:
+		_trace_query_failed(query, matches.size())
 		_record_failure("Expected at most one match for %s, found %d" % [query["label"], matches.size()])
 		return null
+	_trace_query_resolved(query, matches.size())
 	return _target_locator(matches[0], str(query["label"]))
 
 
 func _find_single_locator(query: Dictionary, timeout_sec: float = 2.0, step_frames: int = 1) -> GodoteerLocator:
+	_trace_query_started(query, {
+		"timeout_sec": timeout_sec,
+		"step_frames": step_frames,
+	})
 	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
 	while Time.get_ticks_msec() <= deadline:
 		var matches := _resolve_matches(query)
 		if matches.size() == 1:
+			_trace_query_resolved(query, matches.size())
 			return _target_locator(matches[0], str(query["label"]))
 		await wait_frames(step_frames)
 
 	var final_matches := _resolve_matches(query)
 	if final_matches.is_empty():
+		_trace_query_failed(query, 0)
 		_record_failure("Timed out waiting for exactly one match for %s" % query["label"])
 	else:
+		_trace_query_failed(query, final_matches.size())
 		_record_failure("Expected exactly one match for %s, found %d" % [query["label"], final_matches.size()])
 	return null
 
 
-func _get_all_locators(query: Dictionary) -> Array:
+func _get_all_locators(query: Dictionary) -> GodoteerLocatorList:
+	_trace_query_started(query)
 	var matches := _resolve_matches(query)
 	if matches.is_empty():
+		_trace_query_failed(query, 0)
 		_record_failure("Expected at least one match for %s, found none" % query["label"])
-		return []
-	return _nodes_to_locators(matches, str(query["label"]))
+	else:
+		_trace_query_resolved(query, matches.size())
+	return _locator_list(query)
 
 
-func _query_all_locators(query: Dictionary) -> Array:
-	return _nodes_to_locators(_resolve_matches(query), str(query["label"]))
+func _query_all_locators(query: Dictionary) -> GodoteerLocatorList:
+	_trace_query_started(query)
+	var matches := _resolve_matches(query)
+	_trace_query_resolved(query, matches.size())
+	return _locator_list(query)
 
 
-func _find_all_locators(query: Dictionary, timeout_sec: float = 2.0, step_frames: int = 1) -> Array:
+func _find_all_locators(query: Dictionary, timeout_sec: float = 2.0, step_frames: int = 1) -> GodoteerLocatorList:
+	_trace_query_started(query, {
+		"timeout_sec": timeout_sec,
+		"step_frames": step_frames,
+	})
 	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
 	while Time.get_ticks_msec() <= deadline:
 		var matches := _resolve_matches(query)
 		if not matches.is_empty():
-			return _nodes_to_locators(matches, str(query["label"]))
+			_trace_query_resolved(query, matches.size())
+			return _locator_list(query)
 		await wait_frames(step_frames)
 
+	_trace_query_failed(query, 0)
 	_record_failure("Timed out waiting for at least one match for %s" % query["label"])
-	return []
+	return _locator_list(query)
 
 
 func _nodes_to_locators(nodes: Array, description: String) -> Array:
@@ -1192,11 +1526,33 @@ func _target_locator(target: Variant, description: String) -> GodoteerLocator:
 	return GodoteerLocator.new(self, {"kind": "target", "value": target}, description)
 
 
+func _locator_list(query: Dictionary) -> GodoteerLocatorList:
+	return GodoteerLocatorList.new(self, query, str(query.get("label", "locator_list")))
+
+
 func _resolve_matches(query: Dictionary) -> Array:
 	var start := _query_root(query.get("root", null))
 	var matches: Array = []
 	_collect_matches(start, query, matches)
 	return matches
+
+
+func _resolve_collection_position(query: Dictionary) -> Node:
+	var collection_query: Dictionary = query.get("query", {})
+	var matches := _resolve_matches(collection_query)
+	if matches.is_empty():
+		return null
+
+	match str(query.get("mode", "nth")):
+		"first":
+			return matches[0]
+		"last":
+			return matches[matches.size() - 1]
+		_:
+			var index := int(query.get("index", -1))
+			if index < 0 or index >= matches.size():
+				return null
+			return matches[index]
 
 
 func _query_root(root_target: Variant) -> Node:
@@ -1471,6 +1827,81 @@ func _viewport_image_from(viewport: Viewport) -> Image:
 	return texture.get_image()
 
 
+func _capture_screen_image() -> Image:
+	if not can_screenshot():
+		_record_failure("Screenshots unavailable with current renderer/window mode")
+		return null
+
+	var image := _viewport_image()
+	if image == null:
+		_record_failure("Could not read viewport image for screenshot")
+		return null
+
+	return image
+
+
+func _capture_locator_image(target: Variant) -> Image:
+	if not can_screenshot():
+		_record_failure("Screenshots unavailable with current renderer/window mode")
+		return null
+
+	var target_node := node(target)
+	if not target_node is Control:
+		_record_failure("capture_locator() supports Control only: %s" % str(target))
+		return null
+
+	var control: Control = target_node
+	if not control.is_visible_in_tree():
+		_record_failure("capture_locator() target is not visible: %s" % str(target))
+		return null
+
+	var image := _viewport_image()
+	if image == null:
+		_record_failure("Could not read viewport image for locator capture")
+		return null
+
+	var crop_rect := _locator_capture_rect(control, Vector2i(image.get_width(), image.get_height()))
+	if crop_rect.size.x <= 0 or crop_rect.size.y <= 0:
+		_record_failure("capture_locator() invalid crop rect for %s: %s" % [str(target), str(crop_rect)])
+		return null
+
+	var cropped := image.get_region(crop_rect)
+	if cropped == null or cropped.is_empty():
+		_record_failure("capture_locator() failed to crop image for %s" % str(target))
+		return null
+
+	return cropped
+
+
+func _capture_camera_image(camera_target: Variant) -> Image:
+	if DisplayServer.get_name() == "headless":
+		_record_failure("Camera screenshots unavailable with current renderer/window mode")
+		return null
+
+	var camera_node := node(camera_target)
+	if not (camera_node is Camera2D or camera_node is Camera3D):
+		_record_failure("capture_camera() supports Camera2D and Camera3D only: %s" % str(camera_target))
+		return null
+
+	var viewport := camera_node.get_viewport()
+	if viewport == null or viewport.get_texture() == null:
+		_record_failure("capture_camera() could not resolve viewport texture for %s" % str(camera_target))
+		return null
+
+	var previous_camera: Variant = _active_camera_for_viewport(viewport, camera_node)
+	if previous_camera != camera_node:
+		camera_node.make_current()
+		await wait_frames(2)
+
+	var image := _viewport_image_from(viewport)
+	_restore_camera(previous_camera, camera_node)
+	if image == null:
+		_record_failure("Could not read viewport image for camera capture")
+		return null
+
+	return image
+
+
 func _save_png_image(image: Image, file_name: String) -> String:
 	var save_path := artifacts_dir.path_join(file_name)
 	var absolute_path := ProjectSettings.globalize_path(save_path)
@@ -1485,7 +1916,206 @@ func _save_png_image(image: Image, file_name: String) -> String:
 		_record_failure("Could not save screenshot: %s" % save_path)
 		return ""
 
+	_trace_artifact(absolute_path, _artifact_kind_for_path(save_path), "Saved artifact %s" % save_path)
 	return absolute_path
+
+
+func _assert_snapshot_image(image: Image, file_name: String, options: Dictionary, source_label: String) -> bool:
+	var baseline_info := _snapshot_baseline_info(file_name)
+	if baseline_info.is_empty():
+		_record_failure("Could not derive snapshot baseline path for %s" % file_name)
+		return false
+
+	var baseline_res_path := str(baseline_info["res_path"])
+	var baseline_absolute_path := str(baseline_info["absolute_path"])
+	var threshold := max(int(options.get("max_diff_pixels", 0)), 0)
+	var baseline_exists := FileAccess.file_exists(baseline_absolute_path)
+
+	if not baseline_exists:
+		if update_snapshots:
+			if _write_snapshot_baseline(image, baseline_absolute_path):
+				print("    SNAPSHOT create %s [%s]" % [baseline_res_path, source_label])
+				_trace_event("artifact_finished", {
+					"message": "Created snapshot baseline %s" % baseline_res_path,
+					"artifact_kind": "snapshot_baseline",
+					"file_path": baseline_absolute_path,
+				})
+				return true
+			return false
+
+		_record_failure("Missing snapshot baseline for %s: %s" % [source_label, baseline_res_path])
+		return false
+
+	var baseline := Image.load_from_file(baseline_absolute_path)
+	if baseline == null or baseline.is_empty():
+		_record_failure("Could not load snapshot baseline: %s" % baseline_res_path)
+		return false
+
+	var comparison := _compare_snapshot_images(baseline, image)
+	var diff_pixels := int(comparison.get("diff_pixels", -1))
+	if diff_pixels >= 0 and diff_pixels <= threshold:
+		_trace_event("artifact_finished", {
+			"message": "Snapshot matched %s" % baseline_res_path,
+			"artifact_kind": "snapshot_assertion",
+			"file_path": baseline_absolute_path,
+		})
+		return true
+
+	if update_snapshots:
+		if _write_snapshot_baseline(image, baseline_absolute_path):
+			print("    SNAPSHOT update %s [%s]" % [baseline_res_path, source_label])
+			_trace_event("artifact_finished", {
+				"message": "Updated snapshot baseline %s" % baseline_res_path,
+				"artifact_kind": "snapshot_baseline",
+				"file_path": baseline_absolute_path,
+			})
+			return true
+		return false
+
+	var artifact_dir := _snapshot_artifact_dir(file_name)
+	var actual_path := _save_png_image(image, artifact_dir.path_join("actual.png"))
+	var diff_image: Image = comparison.get("diff_image")
+	var diff_path := ""
+	if diff_image != null and not diff_image.is_empty():
+		diff_path = _save_png_image(diff_image, artifact_dir.path_join("diff.png"))
+
+	var failure_message := "Snapshot mismatch for %s baseline=%s diff_pixels=%d max_diff_pixels=%d actual=%s diff=%s" % [
+		source_label,
+		baseline_res_path,
+		diff_pixels,
+		threshold,
+		actual_path,
+		diff_path,
+	]
+	if baseline.get_width() != image.get_width() or baseline.get_height() != image.get_height():
+		failure_message = "Snapshot size mismatch for %s baseline=%s expected=%dx%d actual=%dx%d actual=%s diff=%s" % [
+			source_label,
+			baseline_res_path,
+			baseline.get_width(),
+			baseline.get_height(),
+			image.get_width(),
+			image.get_height(),
+			actual_path,
+			diff_path,
+		]
+	_record_failure(failure_message)
+	return false
+
+
+func _write_snapshot_baseline(image: Image, absolute_path: String) -> bool:
+	var absolute_dir := absolute_path.get_base_dir()
+	var dir_error := DirAccess.make_dir_recursive_absolute(absolute_dir)
+	if dir_error != OK:
+		_record_failure("Could not create snapshot baseline dir: %s" % absolute_dir)
+		return false
+
+	var save_error := image.save_png(absolute_path)
+	if save_error != OK:
+		_record_failure("Could not save snapshot baseline: %s" % absolute_path)
+		return false
+
+	_trace_event("artifact_written", {
+		"message": "Saved snapshot baseline %s" % absolute_path,
+		"artifact_kind": "snapshot_baseline",
+		"file_path": absolute_path,
+	})
+	return true
+
+
+func _compare_snapshot_images(expected: Image, actual: Image) -> Dictionary:
+	var width := max(expected.get_width(), actual.get_width())
+	var height := max(expected.get_height(), actual.get_height())
+	var diff_image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	diff_image.fill(Color(0, 0, 0, 0))
+
+	var diff_pixels := 0
+	for y in range(height):
+		for x in range(width):
+			var expected_in_bounds := x < expected.get_width() and y < expected.get_height()
+			var actual_in_bounds := x < actual.get_width() and y < actual.get_height()
+			if expected_in_bounds and actual_in_bounds and expected.get_pixel(x, y) == actual.get_pixel(x, y):
+				continue
+
+			diff_pixels += 1
+			if not expected_in_bounds or not actual_in_bounds:
+				diff_image.set_pixel(x, y, Color(1.0, 0.6, 0.0, 1.0))
+			else:
+				diff_image.set_pixel(x, y, Color(1.0, 0.0, 0.6, 1.0))
+
+	return {
+		"diff_pixels": diff_pixels,
+		"diff_image": diff_image,
+	}
+
+
+func _snapshot_baseline_info(file_name: String) -> Dictionary:
+	var suite_dir := _snapshot_suite_relative_dir()
+	var test_segment := _sanitize_snapshot_segment(active_test_name)
+	var file_segment := _sanitize_snapshot_file_name(file_name)
+	if suite_dir == "" or test_segment == "" or file_segment == "":
+		return {}
+
+	var res_path := "res://tests/__snapshots__/%s/%s/%s" % [suite_dir, test_segment, file_segment]
+	return {
+		"res_path": res_path,
+		"absolute_path": ProjectSettings.globalize_path(res_path),
+	}
+
+
+func _snapshot_suite_relative_dir() -> String:
+	var suite_path := active_suite_path
+	if suite_path == "":
+		return ""
+
+	if suite_path.begins_with("res://tests/"):
+		suite_path = suite_path.trim_prefix("res://tests/")
+	elif suite_path.begins_with("res://"):
+		suite_path = suite_path.trim_prefix("res://")
+
+	suite_path = suite_path.trim_suffix(".gd")
+	var parts := suite_path.split("/", false)
+	for index in range(parts.size()):
+		parts[index] = _sanitize_snapshot_segment(parts[index])
+	return "/".join(parts)
+
+
+func _snapshot_artifact_dir(file_name: String) -> String:
+	return "visual_failures/%s/%s/%s" % [
+		_snapshot_suite_relative_dir(),
+		_sanitize_snapshot_segment(active_test_name),
+		_sanitize_snapshot_stem(file_name),
+	]
+
+
+func _sanitize_snapshot_file_name(file_name: String) -> String:
+	var stem := _sanitize_snapshot_stem(file_name)
+	if stem == "":
+		return ""
+	return "%s.png" % stem
+
+
+func _sanitize_snapshot_stem(value: String) -> String:
+	var segments := str(value).split("/", false)
+	var sanitized_segments: Array[String] = []
+	for segment in segments:
+		var trimmed_segment := str(segment).trim_suffix(".png")
+		var sanitized := _sanitize_snapshot_segment(trimmed_segment)
+		if sanitized != "":
+			sanitized_segments.append(sanitized)
+	return "__".join(sanitized_segments)
+
+
+func _sanitize_snapshot_segment(value: String) -> String:
+	var sanitized := str(value).strip_edges()
+	for char in ["/", "\\", ":", "*", "?", "\"", "<", ">", "|", " "]:
+		sanitized = sanitized.replace(char, "_")
+	while sanitized.contains("__"):
+		sanitized = sanitized.replace("__", "_")
+	while sanitized.begins_with("_"):
+		sanitized = sanitized.substr(1)
+	while sanitized.ends_with("_"):
+		sanitized = sanitized.left(sanitized.length() - 1)
+	return sanitized
 
 
 func _locator_capture_rect(control: Control, image_size: Vector2i) -> Rect2i:
@@ -1693,6 +2323,65 @@ func _accessibility_contextual_info(candidate: Node) -> String:
 
 	var value = candidate.call("_accessibility_get_contextual_info")
 	return str(value) if value is String else ""
+
+
+func _trace_action_started(action_name: String, details: Dictionary = {}) -> void:
+	var payload := details.duplicate()
+	payload["action_name"] = action_name
+	payload["message"] = "Action started: %s" % action_name
+	_trace_event("action_started", payload)
+
+
+func _trace_action_finished(action_name: String, details: Dictionary = {}) -> void:
+	var payload := details.duplicate()
+	payload["action_name"] = action_name
+	payload["message"] = "Action finished: %s" % action_name
+	_trace_event("action_finished", payload)
+
+
+func _trace_query_started(query: Dictionary, details: Dictionary = {}) -> void:
+	var payload := details.duplicate()
+	payload["query_label"] = str(query.get("label", ""))
+	payload["message"] = "Query started: %s" % str(query.get("label", ""))
+	_trace_event("query_started", payload)
+
+
+func _trace_query_resolved(query: Dictionary, match_count: int) -> void:
+	_trace_event("query_resolved", {
+		"query_label": str(query.get("label", "")),
+		"match_count": match_count,
+		"message": "Query resolved: %s (%d)" % [str(query.get("label", "")), match_count],
+	})
+
+
+func _trace_query_failed(query: Dictionary, match_count: int) -> void:
+	_trace_event("query_failed", {
+		"query_label": str(query.get("label", "")),
+		"match_count": match_count,
+		"message": "Query failed: %s (%d)" % [str(query.get("label", "")), match_count],
+	})
+
+
+func _trace_artifact(file_path: String, artifact_kind: String, message: String = "") -> void:
+	if trace_recorder == null or file_path == "":
+		return
+	trace_recorder.record_artifact(file_path, artifact_kind, message)
+
+
+func _trace_event(kind: String, details: Dictionary = {}) -> void:
+	if trace_recorder == null:
+		return
+	trace_recorder.record(kind, details)
+
+
+func _artifact_kind_for_path(save_path: String) -> String:
+	if save_path.contains("/failures/"):
+		return "failure_screenshot"
+	if save_path.contains("/visual_failures/"):
+		return "visual_artifact"
+	if save_path.contains("/traces/"):
+		return "trace_bundle"
+	return "screenshot"
 
 
 func _accessibility_live(candidate: Node) -> int:

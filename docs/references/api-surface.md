@@ -59,6 +59,7 @@ Scene-only helpers:
 Diagnostics:
 
 - scene failures auto-capture screenshot when active screen exists and screenshot capture is available
+- scene failures also write `trace.jsonl` and `summary.txt` under `user://artifacts/traces/...`
 
 ## `GodoteerDriver`
 
@@ -158,8 +159,11 @@ Accessibility helpers:
 Artifacts:
 
 - `screenshot(file_name = "screenshot.png")`
+- `expect_snapshot(file_name, options = {})`
 - `capture_locator(target, file_name = "locator.png")`
+- `expect_locator_snapshot(target, file_name, options = {})`
 - `await capture_camera(camera_target, file_name = "camera.png")`
+- `await expect_camera_snapshot(camera_target, file_name, options = {})`
 - `can_screenshot()`
 
 Current support matrix:
@@ -170,6 +174,9 @@ Current support matrix:
 - `focus` / `blur`: `Control`
 - `capture_locator`: cropped PNG for visible `Control` targets only
 - `capture_camera`: `Camera2D`, `Camera3D`
+- visual baselines: `res://tests/__snapshots__/<suite>/<test>/<file>.png`
+- visual mismatch artifacts: `user://artifacts/visual_failures/<suite>/<test>/<file>/actual.png|diff.png`
+- visual comparison: exact size + exact pixels by default, optional `max_diff_pixels`
 - activation actions honor disabled controls
 - text entry actions honor `editable = false` on `LineEdit` / `TextEdit`
 - pointer and focus helpers prefer real input/focus behavior for `Control` targets, with limited fallback when GUI dispatch does not fire
@@ -182,19 +189,42 @@ Current support matrix:
 Queries:
 
 - `get/query/find/get_all/query_all/find_all_by_role(...)`
-- `get/query/find_by_text(...)`
-- `get/query/find_by_label_text(...)`
-- `get/query/find_by_placeholder_text(...)`
-- `get/query_by_node_name(...)`
+- `get/query/find/get_all/query_all/find_all_by_text(...)`
+- `get/query/find/get_all/query_all/find_all_by_label_text(...)`
+- `get/query/find/get_all/query_all/find_all_by_placeholder_text(...)`
+- `get/query/get_all/query_all/find_all_by_node_name(...)`
 
 Semantics:
 
 - `get_*`: fail on zero or multiple, no waiting
 - `query_*`: `null` on zero, fail on multiple, no waiting
 - `find_*`: wait up to timeout and fail on timeout
+- `get_all_*`, `query_all_*`, `find_all_*`: return live `GodoteerLocatorList`
 - role query options support `name`, `description`, `checked`, `disabled`, `exact`, `include_hidden`
 - exact matching compares raw Godot strings with no edge trimming
 - non-exact matching uses case-insensitive substring checks
+
+## `GodoteerLocatorList`
+
+File: `sample_project/addons/godoteer/locator_list.gd`
+
+Live collection helpers:
+
+- `count()`
+- `is_empty()`
+- `all()`
+- `nth(index)`
+- `first()`
+- `last()`
+- `await to_have_count(expected, timeout_sec = 2.0)`
+- `await to_be_empty(timeout_sec = 2.0)`
+
+Notes:
+
+- collection methods re-resolve current matches each call
+- `nth()` is zero-based
+- `get_all_*` no longer returns raw array
+- use `.all()` when manual iteration needs array semantics
 
 ## `GodoteerLocator`
 
@@ -215,6 +245,7 @@ Actions:
 - `await set_checked(checked)`
 - `await select_option(option_text)`
 - `capture(file_name = "locator.png")`
+- `expect_snapshot(file_name, options = {})`
 
 Reads:
 
@@ -242,6 +273,14 @@ Waited assertions:
 - `await to_have_accessible_description(expected, timeout_sec = 2.0)`
 - `await to_have_accessibility_role(expected, timeout_sec = 2.0)`
 
+Scoped collection queries:
+
+- `get_all/query_all/find_all_by_role(...)`
+- `get_all/query_all/find_all_by_text(...)`
+- `get_all/query_all/find_all_by_label_text(...)`
+- `get_all/query_all/find_all_by_placeholder_text(...)`
+- `get_all/query_all/find_all_by_node_name(...)`
+
 Exact text and accessibility assertions compare raw strings as Godot exposes them. Leading spaces, trailing spaces, and trailing newlines stay significant.
 
 Current instant helpers still available:
@@ -262,6 +301,7 @@ Args:
 - `--artifacts <path>`
 - `--grep <text>` for case-insensitive suite/test filtering
 - `--junit <path>` for JUnit XML output
+- `--update-snapshots` to create or refresh visual baselines
 
 Behavior:
 
@@ -274,3 +314,4 @@ Behavior:
 - supports mixed unit and scene suites in same directory tree
 - prints grouped failure summary by suite path and test name
 - writes JUnit XML on pass and fail when `--junit` is set
+- creates or overwrites baseline PNGs when `--update-snapshots` is set

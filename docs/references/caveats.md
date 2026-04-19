@@ -47,6 +47,10 @@
 - Use windowed runs for visual assertions.
 - `locator.capture(...)` crops visible `Control` targets only.
 - `screen.capture_camera(...)` captures full camera viewport, not cropped node regions.
+- visual snapshot assertions compare exact PNG dimensions and pixels by default.
+- visual baselines live in repo under `res://tests/__snapshots__/`.
+- `--update-snapshots` is required to create or refresh baselines intentionally.
+- mismatches write `actual.png` and `diff.png` under `user://artifacts/visual_failures/`.
 - Crop fails hard for hidden, unsupported, or offscreen targets.
 
 ## Click Model
@@ -72,12 +76,14 @@
 - Good for multi-assert diagnostics.
 - Bad for fail-fast expectations unless test drains or inspects failures intentionally.
 - Unit and scene suites share same failure collector.
+- Scene suites write failure trace bundles only when a test fails.
+- Trace bundles are lightweight JSONL/text artifacts, not replayable traces.
 
 ## Missing Features
 
 - No full OS accessibility tree dump or assistive-tech emulation APIs.
 - No image diff assertions.
-- No trace or record/replay support.
+- No trace viewer or record/replay support.
 - Low-level input helpers synthesize Godot events; they are not platform-native HID integration.
 
 ## Accessibility Inspection

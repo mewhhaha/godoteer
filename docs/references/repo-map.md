@@ -30,10 +30,14 @@ Branch model:
   - scene-only assertions and failure screenshots
 - `driver.gd`
   - scene lifecycle owner
+- `trace_recorder.gd`
+  - failure-only scene trace bundle recorder
 - `screen.gd`
   - queries, low-level actions, viewport and camera capture
 - `locator.gd`
   - locator-first actions and waited assertions
+- `locator_list.gd`
+  - live collection wrapper for multi-match queries
 - `runner.gd`
   - single-file or directory execution
 
@@ -47,6 +51,13 @@ Branch model:
   - proves `fill`, `clear`, `hover`, `focus`, `blur`, `drag_to`, `check`, `uncheck`, `set_checked`, `select_option`
   - proves waited locator assertions including negative/state and accessibility helpers
   - proves cropped locator screenshots, camera-targeted capture, plus failure guard for hidden targets
+
+- `sample_project/tests/scene/visual_snapshot_test.gd`
+  - proves repo-backed full-screen, locator, and camera PNG baselines
+  - proves missing-baseline failure and mismatch artifact output in windowed runs
+
+- `sample_project/tests/scene/collection_locator_test.gd`
+  - proves live collection counts, positional access, delayed multi-match waits, and out-of-range failures
 
 - `sample_project/tests/scene/accessibility_inspection_test.gd`
   - proves relation-aware accessibility queries with `description`, `checked`, and `disabled`
@@ -77,10 +88,19 @@ Branch model:
 - `sample_project/scenes/input_matrix_probe.tscn`
   - fixture scene that records low-level input events in `_input(event)`
 
+- `sample_project/scenes/collection_probe.tscn`
+  - fixture scene for repeated text, repeated controls, repeated labels/placeholders, and delayed multi-match content
+
+- `sample_project/trace_probes/trace_bundle_probe_test.gd`
+  - dedicated pass/fail scene suite for failure trace bundle verification outside main green test tree
+
+- `sample_project/tests/__snapshots__/`
+  - checked-in visual snapshot baselines keyed by suite path, test name, and logical file name
+
 ## Runtime Flow
 
 1. Godot starts with `runner.gd` via `-s`
-2. Runner parses `--test` or `--dir` plus optional `--grep` and `--junit`
+2. Runner parses `--test` or `--dir` plus optional `--grep`, `--junit`, and `--update-snapshots`
 3. Runner loads suite files in sorted order
 4. Unit suites run directly; scene suites create one driver per suite
 5. Failures collect on suite object and also aggregate into grouped runner summary
