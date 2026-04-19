@@ -37,6 +37,7 @@
 - `Viewport.get_texture()` may be null in headless mode.
 - `screen.can_screenshot()` guards screenshot capture and should stay honest.
 - Use windowed runs for visual assertions.
+- `locator.capture(...)` currently uses full-screen capture, not element cropping.
 
 ## Click Model
 
@@ -54,7 +55,6 @@
 ## Missing Features
 
 - No DOM-like accessibility tree traversal APIs.
-- No `fill()` helper yet.
-- No drag/drop helper.
+- No cropped element screenshot assertion yet.
 - No image diff assertions.
 - No trace or record/replay support.

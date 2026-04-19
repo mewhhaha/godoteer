@@ -44,12 +44,12 @@ Branch model:
 
 - `sample_project/tests/scene/smoke_test.gd`
   - proves accessibility-first queries
-  - proves `fill`, `clear`, `check`, `uncheck`, `select_option`
-  - proves waited locator assertions
+  - proves `fill`, `clear`, `hover`, `focus`, `blur`, `drag_to`, `check`, `uncheck`, `set_checked`, `select_option`
+  - proves waited locator assertions including negative/state helpers
   - proves screenshot guard
 
 - `sample_project/scenes/sample_app.tscn`
-  - fixture scene with textbox, checkbox, combobox, button, and status text
+  - fixture scene with textbox, checkbox, combobox, hidden/disabled/transient controls, drag widgets, button, and status text
 
 ## Runtime Flow
 

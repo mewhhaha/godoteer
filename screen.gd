@@ -38,6 +38,9 @@ func wait_until(predicate: Callable, timeout_sec: float = 2.0, step_frames: int 
 
 
 func node(path_or_node: Variant) -> Node:
+	if typeof(path_or_node) == TYPE_OBJECT and not is_instance_valid(path_or_node):
+		return null
+
 	if path_or_node is Node:
 		return path_or_node if is_instance_valid(path_or_node) else null
 
@@ -133,6 +136,39 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	await wait_frames(1)
 
 
+func hover(target: Variant) -> void:
+	var target_node := node(target)
+	var position := _resolve_position(target)
+	if position == null:
+		_record_failure("Could not resolve hover target: %s" % str(target))
+		return
+
+	mouse_move(position)
+	if target_node is Control:
+		target_node.mouse_entered.emit()
+	await wait_frames(1)
+
+
+func focus(target: Variant) -> void:
+	var target_node := node(target)
+	if target_node is Control:
+		target_node.grab_focus()
+		await wait_frames(1)
+		return
+
+	_record_failure("focus() supports Control only: %s" % str(target))
+
+
+func blur(target: Variant) -> void:
+	var target_node := node(target)
+	if target_node is Control:
+		target_node.release_focus()
+		await wait_frames(1)
+		return
+
+	_record_failure("blur() supports Control only: %s" % str(target))
+
+
 func fill(target: Variant, text: String) -> void:
 	var target_node := node(target)
 	if target_node is LineEdit:
@@ -142,7 +178,13 @@ func fill(target: Variant, text: String) -> void:
 		await wait_frames(1)
 		return
 
-	_record_failure("fill() supports LineEdit only right now: %s" % str(target))
+	if target_node is TextEdit:
+		target_node.grab_focus()
+		target_node.text = text
+		await wait_frames(1)
+		return
+
+	_record_failure("fill() supports LineEdit and TextEdit only: %s" % str(target))
 
 
 func clear(target: Variant) -> void:
@@ -154,6 +196,42 @@ func press(target: Variant, keycode: Key) -> void:
 	if target_node is Control:
 		target_node.grab_focus()
 	await key_tap(keycode)
+
+
+func drag_to(source: Variant, target_or_position: Variant, duration_sec: float = 0.2, steps: int = 12) -> void:
+	var source_node := node(source)
+	var target_node := node(target_or_position)
+	var from_position := _resolve_position(source)
+	var to_position := _resolve_position(target_or_position)
+	if from_position == null or to_position == null:
+		_record_failure("drag_to() could not resolve source or target: %s -> %s" % [str(source), str(target_or_position)])
+		return
+
+	mouse_move(from_position)
+	await wait_frames(1)
+	var press_event := InputEventMouseButton.new()
+	press_event.position = from_position
+	press_event.global_position = from_position
+	press_event.button_index = MOUSE_BUTTON_LEFT
+	press_event.pressed = true
+	Input.parse_input_event(press_event)
+	last_mouse_position = from_position
+	if source_node is Control:
+		source_node.gui_input.emit(press_event)
+	await wait_frames(1)
+	await move_mouse_between(from_position, to_position, duration_sec, steps)
+	if target_node is Control:
+		target_node.mouse_entered.emit()
+	var release_event := InputEventMouseButton.new()
+	release_event.position = to_position
+	release_event.global_position = to_position
+	release_event.button_index = MOUSE_BUTTON_LEFT
+	release_event.pressed = false
+	Input.parse_input_event(release_event)
+	last_mouse_position = to_position
+	if target_node is Control:
+		target_node.gui_input.emit(release_event)
+	await wait_frames(1)
 
 
 func check(target: Variant) -> void:
@@ -178,6 +256,13 @@ func uncheck(target: Variant) -> void:
 		return
 
 	_record_failure("uncheck() supports CheckBox and CheckButton only: %s" % str(target))
+
+
+func set_checked(target: Variant, checked: bool) -> void:
+	if checked:
+		await check(target)
+	else:
+		await uncheck(target)
 
 
 func select_option(target: Variant, option_text: String) -> void:
@@ -265,19 +350,24 @@ func screenshot(file_name: String = "screenshot.png") -> String:
 		return ""
 
 	var save_path := artifacts_dir.path_join(file_name)
-	var absolute_dir := ProjectSettings.globalize_path(artifacts_dir)
+	var absolute_path := ProjectSettings.globalize_path(save_path)
+	var absolute_dir := absolute_path.get_base_dir()
 	var dir_error := DirAccess.make_dir_recursive_absolute(absolute_dir)
 	if dir_error != OK:
 		_record_failure("Could not create screenshot dir: %s" % absolute_dir)
 		return ""
 
 	var image := tree.root.get_viewport().get_texture().get_image()
-	var save_error := image.save_png(save_path)
+	var save_error := image.save_png(absolute_path)
 	if save_error != OK:
 		_record_failure("Could not save screenshot: %s" % save_path)
 		return ""
 
-	return ProjectSettings.globalize_path(save_path)
+	return absolute_path
+
+
+func capture_locator(target: Variant, file_name: String = "locator.png") -> String:
+	return screenshot(file_name)
 
 
 func can_screenshot() -> bool:

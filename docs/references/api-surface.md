@@ -83,11 +83,16 @@ Timing:
 Actions:
 
 - `await click(target, button = MOUSE_BUTTON_LEFT)`
+- `await hover(target)`
+- `await focus(target)`
+- `await blur(target)`
 - `await fill(target, text)`
 - `await clear(target)`
+- `await drag_to(source, target_or_position, duration_sec = 0.2, steps = 12)`
 - `await press(target, keycode)`
 - `await check(target)`
 - `await uncheck(target)`
+- `await set_checked(target, checked)`
 - `await select_option(target, option_text)`
 
 Node helpers:
@@ -105,7 +110,16 @@ Node helpers:
 Artifacts:
 
 - `screenshot(file_name = "screenshot.png")`
+- `capture_locator(target, file_name = "locator.png")`
 - `can_screenshot()`
+
+Current support matrix:
+
+- `fill` / `clear`: `LineEdit`, `TextEdit`
+- `check` / `uncheck` / `set_checked`: `CheckBox`, `CheckButton`
+- `select_option`: `OptionButton`
+- `focus` / `blur`: `Control`
+- `capture_locator`: full-screen capture only for now, no cropping
 
 Queries:
 
@@ -128,12 +142,18 @@ File: `sample_project/addons/godoteer/locator.gd`
 Actions:
 
 - `await click()`
+- `await hover()`
+- `await focus()`
+- `await blur()`
 - `await fill(text)`
 - `await clear()`
+- `await drag_to(target_or_position, duration_sec = 0.2, steps = 12)`
 - `await press(keycode)`
 - `await check()`
 - `await uncheck()`
+- `await set_checked(checked)`
 - `await select_option(option_text)`
+- `capture(file_name = "locator.png")`
 
 Reads:
 
@@ -146,10 +166,15 @@ Reads:
 Waited assertions:
 
 - `await to_exist(timeout_sec = 2.0)`
+- `await not_to_exist(timeout_sec = 2.0)`
 - `await to_have_text(expected, timeout_sec = 2.0)`
+- `await not_to_have_text(expected, timeout_sec = 2.0)`
 - `await to_have_value(expected, timeout_sec = 2.0)`
 - `await to_be_visible(timeout_sec = 2.0)`
+- `await to_be_hidden(timeout_sec = 2.0)`
 - `await to_be_enabled(timeout_sec = 2.0)`
+- `await to_be_disabled(timeout_sec = 2.0)`
+- `await to_be_checked(timeout_sec = 2.0)`
 
 Current instant helpers still available:
 
