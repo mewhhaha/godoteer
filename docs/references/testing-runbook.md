@@ -32,6 +32,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/gameplay_test.gd
 ```
 
+Headless gameplay-events scene test:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/gameplay_events_test.gd
+```
+
 Headless deterministic simulation scene test:
 
 ```bash
@@ -85,6 +92,8 @@ godot --headless --path sample_project --script tests/scene/smoke_test.gd --chec
 godot --headless --path sample_project --script tests/scene/accessibility_inspection_test.gd --check-only
 godot --headless --path sample_project --script scripts/gameplay_input_probe.gd --check-only
 godot --headless --path sample_project --script tests/scene/gameplay_test.gd --check-only
+godot --headless --path sample_project --script scripts/gameplay_events_probe.gd --check-only
+godot --headless --path sample_project --script tests/scene/gameplay_events_test.gd --check-only
 godot --headless --path sample_project --script scripts/simulation_probe.gd --check-only
 godot --headless --path sample_project --script tests/scene/simulation_test.gd --check-only
 godot --headless --path sample_project --script scripts/input_matrix_probe.gd --check-only

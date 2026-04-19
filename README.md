@@ -76,6 +76,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/gameplay_test.gd
 ```
 
+Run gameplay-events scene test headless:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/gameplay_events_test.gd
+```
+
 Run deterministic simulation scene test headless:
 
 ```bash
@@ -131,6 +138,24 @@ func test_move_and_jump(driver: GodoteerDriver) -> void:
 	screen.action_release("jump")
 ```
 
+Gameplay interaction example:
+
+```gdscript
+extends "res://addons/godoteer/test_scene.gd"
+
+const GAMEPLAY_EVENTS_PROBE := preload("res://scenes/gameplay_events_probe.tscn")
+
+func test_double_click_and_signal_counts(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(GAMEPLAY_EVENTS_PROBE)
+	var probe := screen.get_by_node_name("GameplayEventsProbe").node()
+	var pointer_target := screen.get_by_node_name("PointerTarget")
+
+	await pointer_target.dblclick()
+	probe.start_process_burst(3, "burst")
+	var history := await screen.expect_signal_count(probe, "probe_signal", 3, 12)
+	expect(history.size() == 3, "burst should emit three signals")
+```
+
 Deterministic simulation example:
 
 ```gdscript
@@ -148,11 +173,14 @@ func test_process_and_physics_progress(driver: GodoteerDriver) -> void:
 ```
 
 Useful scene actions:
+- `await locator.dblclick(button = MOUSE_BUTTON_LEFT)`
+- `await locator.right_click()`
 - `await locator.fill(text)`
 - `await locator.clear()`
 - `await locator.hover()`
 - `await locator.focus()`
 - `await locator.blur()`
+- `await locator.long_press(hold_frames = 12, button = MOUSE_BUTTON_LEFT)`
 - `await locator.drag_to(target_or_position)`
 - `await locator.press(keycode)`
 - `await locator.check()`
@@ -170,6 +198,8 @@ Useful scene actions:
 - `screen.key_press(keycode)`
 - `screen.key_release(keycode)`
 - `await screen.key_tap(keycode, hold_frames = 1)`
+- `await screen.hold_key_until(keycode, predicate, max_frames = 120)`
+- `await screen.key_chord(keycodes, hold_frames = 1)`
 - `screen.joy_button_press(button, device = 0)`
 - `screen.joy_button_release(button, device = 0)`
 - `await screen.joy_button_tap(button, hold_frames = 1, device = 0)`
@@ -183,6 +213,14 @@ Useful scene actions:
 - `await screen.touch_tap(position, index = 0, hold_frames = 1)`
 - `await screen.touch_drag(from, to, index = 0, duration_sec = 0.2, steps = 12)`
 - `await screen.touch_pinch(start_a, start_b, end_a, end_b, duration_sec = 0.2, steps = 12, index_a = 0, index_b = 1)`
+- `await screen.hold_action_until(action_name, predicate, max_frames = 120, strength = 1.0)`
+- `await screen.expect_signal(target, signal_name, max_frames = 120, physics = false)`
+- `await screen.expect_no_signal(target, signal_name, max_frames = 120, physics = false)`
+- `await screen.expect_signal_count(target, signal_name, expected_count, max_frames = 120, physics = false)`
+- `await screen.wait_for_animation_finished(player, animation_name = "", max_frames = 120)`
+- `await screen.wait_for_audio_finished(player, max_frames = 120)`
+- `await screen.wait_for_body_entered(area, max_frames = 120)`
+- `await screen.wait_for_area_entered(area, max_frames = 120)`
 
 Semantic actions still respect control state. Disabled controls refuse activation, and text entry helpers refuse non-editable `LineEdit` / `TextEdit` targets.
 

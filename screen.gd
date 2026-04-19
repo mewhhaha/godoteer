@@ -11,6 +11,8 @@ class SignalProbe:
 	var fired := false
 	var args: Array = []
 	var arg_count := 0
+	var count := 0
+	var history: Array = []
 
 	func mark(
 		_arg1 = null,
@@ -23,8 +25,10 @@ class SignalProbe:
 		_arg8 = null
 	) -> void:
 		fired = true
+		count += 1
 		var values := [_arg1, _arg2, _arg3, _arg4, _arg5, _arg6, _arg7, _arg8]
 		args = values.slice(0, min(arg_count, values.size()))
+		history.append(args.duplicate())
 
 var tree: SceneTree
 var app_root: Node
@@ -276,6 +280,419 @@ func next_signal(
 	}
 
 
+func hold_action_until(
+	action_name: String,
+	predicate: Callable,
+	max_frames := 120,
+	strength := 1.0,
+	message: String = ""
+) -> bool:
+	_trace_action_started("hold_action_until", {
+		"input_action": action_name,
+		"max_frames": int(max_frames),
+		"strength": strength,
+	})
+	if not _ensure_action_exists("hold_action_until", action_name):
+		return false
+
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Condition timed out while holding action %s" % action_name
+
+	action_press(action_name, strength)
+	_trace_event("wait_started", {
+		"message": wait_message,
+		"input_action": action_name,
+		"max_frames": int(max_frames),
+		"wait_kind": "hold_action_until",
+	})
+
+	if predicate.call():
+		action_release(action_name)
+		await wait_frames(1)
+		_trace_event("wait_finished", {
+			"message": wait_message,
+			"input_action": action_name,
+			"max_frames": int(max_frames),
+			"wait_kind": "hold_action_until",
+		})
+		_trace_action_finished("hold_action_until", {
+			"input_action": action_name,
+			"max_frames": int(max_frames),
+		})
+		return true
+
+	for _frame in range(max(int(max_frames), 0)):
+		await wait_frames(1)
+		if predicate.call():
+			action_release(action_name)
+			await wait_frames(1)
+			_trace_event("wait_finished", {
+				"message": wait_message,
+				"input_action": action_name,
+				"max_frames": int(max_frames),
+				"wait_kind": "hold_action_until",
+			})
+			_trace_action_finished("hold_action_until", {
+				"input_action": action_name,
+				"max_frames": int(max_frames),
+			})
+			return true
+
+	action_release(action_name)
+	await wait_frames(1)
+	_trace_event("wait_timed_out", {
+		"message": wait_message,
+		"input_action": action_name,
+		"max_frames": int(max_frames),
+		"wait_kind": "hold_action_until",
+	})
+	_record_failure(wait_message)
+	_trace_action_finished("hold_action_until", {
+		"input_action": action_name,
+		"max_frames": int(max_frames),
+	})
+	return false
+
+
+func hold_key_until(keycode: Key, predicate: Callable, max_frames := 120, message: String = "") -> bool:
+	_trace_action_started("hold_key_until", {
+		"keycode": keycode,
+		"max_frames": int(max_frames),
+	})
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Condition timed out while holding key %s" % keycode
+
+	key_press(keycode)
+	_trace_event("wait_started", {
+		"message": wait_message,
+		"keycode": keycode,
+		"max_frames": int(max_frames),
+		"wait_kind": "hold_key_until",
+	})
+
+	if predicate.call():
+		key_release(keycode)
+		await wait_frames(1)
+		_trace_event("wait_finished", {
+			"message": wait_message,
+			"keycode": keycode,
+			"max_frames": int(max_frames),
+			"wait_kind": "hold_key_until",
+		})
+		_trace_action_finished("hold_key_until", {
+			"keycode": keycode,
+			"max_frames": int(max_frames),
+		})
+		return true
+
+	for _frame in range(max(int(max_frames), 0)):
+		await wait_frames(1)
+		if predicate.call():
+			key_release(keycode)
+			await wait_frames(1)
+			_trace_event("wait_finished", {
+				"message": wait_message,
+				"keycode": keycode,
+				"max_frames": int(max_frames),
+				"wait_kind": "hold_key_until",
+			})
+			_trace_action_finished("hold_key_until", {
+				"keycode": keycode,
+				"max_frames": int(max_frames),
+			})
+			return true
+
+	key_release(keycode)
+	await wait_frames(1)
+	_trace_event("wait_timed_out", {
+		"message": wait_message,
+		"keycode": keycode,
+		"max_frames": int(max_frames),
+		"wait_kind": "hold_key_until",
+	})
+	_record_failure(wait_message)
+	_trace_action_finished("hold_key_until", {
+		"keycode": keycode,
+		"max_frames": int(max_frames),
+	})
+	return false
+
+
+func key_chord(keycodes: Array, hold_frames := 1) -> void:
+	_trace_action_started("key_chord", {
+		"keycodes": keycodes.duplicate(),
+		"hold_frames": int(hold_frames),
+	})
+	for keycode in keycodes:
+		key_press(int(keycode))
+	await wait_frames(max(int(hold_frames), 1))
+	for index in range(keycodes.size() - 1, -1, -1):
+		key_release(int(keycodes[index]))
+	await wait_frames(1)
+	_trace_action_finished("key_chord", {
+		"keycodes": keycodes.duplicate(),
+		"hold_frames": int(hold_frames),
+	})
+
+
+func expect_signal(
+	target: Variant,
+	signal_name: String,
+	max_frames := 120,
+	physics := false,
+	message: String = ""
+) -> Dictionary:
+	return await _wait_for_signal_match(
+		"expect_signal",
+		target,
+		signal_name,
+		max_frames,
+		physics,
+		func(_args: Array) -> bool:
+			return true,
+		message
+	)
+
+
+func expect_no_signal(
+	target: Variant,
+	signal_name: String,
+	max_frames := 120,
+	physics := false,
+	message: String = ""
+) -> bool:
+	_trace_event("wait_started", {
+		"message": message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": int(max_frames),
+		"wait_kind": "expect_no_signal",
+		"physics": physics,
+	})
+	var target_node := node(target)
+	if target_node == null:
+		_record_failure("expect_no_signal() could not resolve target: %s" % str(target))
+		return false
+	if not target_node.has_signal(signal_name):
+		_record_failure("expect_no_signal() target has no signal %s: %s" % [signal_name, str(target)])
+		return false
+
+	var probe := _connect_signal_probe(target_node, signal_name)
+	if probe == null:
+		_record_failure("expect_no_signal() could not watch signal %s: %s" % [signal_name, str(target)])
+		return false
+
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Expected no signal %s on %s for %d frames" % [signal_name, str(target), int(max_frames)]
+
+	for _frame in range(max(int(max_frames), 0)):
+		await _wait_signal_frame(physics)
+		if probe.fired:
+			_disconnect_signal_probe(target_node, signal_name, probe)
+			_trace_event("wait_finished", {
+				"message": wait_message,
+				"signal_name": signal_name,
+				"target": str(target),
+				"max_frames": int(max_frames),
+				"wait_kind": "expect_no_signal",
+				"physics": physics,
+				"count": probe.count,
+				"history": _duplicate_signal_history(probe.history),
+			})
+			_record_failure("%s actual_count=%d args=%s" % [wait_message, probe.count, var_to_str(_duplicate_signal_history(probe.history))])
+			return false
+
+	_disconnect_signal_probe(target_node, signal_name, probe)
+	_trace_event("wait_finished", {
+		"message": wait_message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": int(max_frames),
+		"wait_kind": "expect_no_signal",
+		"physics": physics,
+		"count": 0,
+	})
+	return true
+
+
+func expect_signal_count(
+	target: Variant,
+	signal_name: String,
+	expected_count: int,
+	max_frames := 120,
+	physics := false,
+	message: String = ""
+) -> Array:
+	_trace_event("wait_started", {
+		"message": message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"expected_count": int(expected_count),
+		"max_frames": int(max_frames),
+		"wait_kind": "expect_signal_count",
+		"physics": physics,
+	})
+	var target_node := node(target)
+	if target_node == null:
+		_record_failure("expect_signal_count() could not resolve target: %s" % str(target))
+		return []
+	if not target_node.has_signal(signal_name):
+		_record_failure("expect_signal_count() target has no signal %s: %s" % [signal_name, str(target)])
+		return []
+
+	var probe := _connect_signal_probe(target_node, signal_name)
+	if probe == null:
+		_record_failure("expect_signal_count() could not watch signal %s: %s" % [signal_name, str(target)])
+		return []
+
+	for _frame in range(max(int(max_frames), 0)):
+		await _wait_signal_frame(physics)
+
+	_disconnect_signal_probe(target_node, signal_name, probe)
+	var history := _duplicate_signal_history(probe.history)
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Expected signal %s on %s to fire %d time(s) in %d frames" % [
+			signal_name,
+			str(target),
+			int(expected_count),
+			int(max_frames),
+		]
+
+	_trace_event("wait_finished", {
+		"message": wait_message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"expected_count": int(expected_count),
+		"actual_count": probe.count,
+		"max_frames": int(max_frames),
+		"wait_kind": "expect_signal_count",
+		"physics": physics,
+		"history": history,
+	})
+	if probe.count != int(expected_count):
+		_record_failure("%s actual=%d history=%s" % [wait_message, probe.count, var_to_str(history)])
+	return history
+
+
+func wait_for_animation_finished(
+	player_target: Variant,
+	animation_name: String = "",
+	max_frames := 120,
+	message: String = ""
+) -> Dictionary:
+	var player_node := node(player_target)
+	if not player_node is AnimationPlayer:
+		_record_failure("wait_for_animation_finished() supports AnimationPlayer only: %s" % str(player_target))
+		return {"fired": false, "args": [], "count": 0, "history": []}
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for animation_finished on %s" % str(player_target)
+	if animation_name != "":
+		wait_message = "Timed out waiting for animation %s to finish on %s" % [animation_name, str(player_target)]
+	return await _wait_for_signal_match(
+		"wait_for_animation_finished",
+		player_target,
+		"animation_finished",
+		max_frames,
+		false,
+		func(args: Array) -> bool:
+			return animation_name == "" or (args.size() > 0 and str(args[0]) == animation_name),
+		wait_message
+	)
+
+
+func wait_for_audio_finished(player_target: Variant, max_frames := 120, message: String = "") -> bool:
+	var player_node := node(player_target)
+	if not (player_node is AudioStreamPlayer or player_node is AudioStreamPlayer2D or player_node is AudioStreamPlayer3D):
+		_record_failure("wait_for_audio_finished() supports AudioStreamPlayer, AudioStreamPlayer2D, and AudioStreamPlayer3D only: %s" % str(player_target))
+		return false
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for audio finished on %s" % str(player_target)
+	_trace_event("wait_started", {
+		"message": wait_message,
+		"target": str(player_target),
+		"max_frames": int(max_frames),
+		"wait_kind": "wait_for_audio_finished",
+	})
+	var probe := _connect_signal_probe(player_node, "finished")
+	if probe == null:
+		_record_failure("wait_for_audio_finished() could not watch signal finished: %s" % str(player_target))
+		return false
+
+	var saw_playing := bool(player_node.playing)
+	for _frame in range(max(int(max_frames), 0)):
+		if player_node.playing:
+			saw_playing = true
+		if probe.fired or (saw_playing and not player_node.playing):
+			_disconnect_signal_probe(player_node, "finished", probe)
+			_trace_event("wait_finished", {
+				"message": wait_message,
+				"target": str(player_target),
+				"max_frames": int(max_frames),
+				"wait_kind": "wait_for_audio_finished",
+				"count": probe.count,
+				"used_playback_fallback": not probe.fired,
+			})
+			return true
+		await wait_frames(1)
+
+	_disconnect_signal_probe(player_node, "finished", probe)
+	_trace_event("wait_timed_out", {
+		"message": wait_message,
+		"target": str(player_target),
+		"max_frames": int(max_frames),
+		"wait_kind": "wait_for_audio_finished",
+		"count": probe.count,
+	})
+	_record_failure(wait_message)
+	return false
+
+
+func wait_for_body_entered(area_target: Variant, max_frames := 120, message: String = "") -> Dictionary:
+	var area_node := node(area_target)
+	if not area_node is Area2D:
+		_record_failure("wait_for_body_entered() supports Area2D only: %s" % str(area_target))
+		return {"fired": false, "args": [], "count": 0, "history": []}
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for body_entered on %s" % str(area_target)
+	return await _wait_for_signal_match(
+		"wait_for_body_entered",
+		area_target,
+		"body_entered",
+		max_frames,
+		true,
+		func(_args: Array) -> bool:
+			return true,
+		wait_message
+	)
+
+
+func wait_for_area_entered(area_target: Variant, max_frames := 120, message: String = "") -> Dictionary:
+	var area_node := node(area_target)
+	if not area_node is Area2D:
+		_record_failure("wait_for_area_entered() supports Area2D only: %s" % str(area_target))
+		return {"fired": false, "args": [], "count": 0, "history": []}
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for area_entered on %s" % str(area_target)
+	return await _wait_for_signal_match(
+		"wait_for_area_entered",
+		area_target,
+		"area_entered",
+		max_frames,
+		true,
+		func(_args: Array) -> bool:
+			return true,
+		wait_message
+	)
+
+
 func pause_scene() -> void:
 	tree.paused = true
 
@@ -336,6 +753,7 @@ func key_press(keycode: Key) -> void:
 	_trace_action_started("key_press", {"keycode": keycode})
 	var press := InputEventKey.new()
 	press.keycode = keycode
+	press.physical_keycode = keycode
 	press.pressed = true
 	Input.parse_input_event(press)
 	pressed_keys[keycode] = true
@@ -346,6 +764,7 @@ func key_release(keycode: Key) -> void:
 	_trace_action_started("key_release", {"keycode": keycode})
 	var release := InputEventKey.new()
 	release.keycode = keycode
+	release.physical_keycode = keycode
 	release.pressed = false
 	Input.parse_input_event(release)
 	pressed_keys.erase(keycode)
@@ -491,8 +910,8 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	if not _ensure_control_enabled("click", target_node, target):
 		return
 
-	var pressed_probe := _connect_signal_probe(target_node, "pressed")
-	var toggled_probe := _connect_signal_probe(target_node, "toggled")
+	var pressed_probe := _connect_signal_probe(target_node, "pressed") if button == MOUSE_BUTTON_LEFT else null
+	var toggled_probe := _connect_signal_probe(target_node, "toggled") if button == MOUSE_BUTTON_LEFT else null
 	var position := _resolve_position(target)
 	if position == null:
 		_disconnect_signal_probe(target_node, "pressed", pressed_probe)
@@ -509,7 +928,7 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 
 	var pressed_fired := _disconnect_signal_probe(target_node, "pressed", pressed_probe)
 	var toggled_fired := _disconnect_signal_probe(target_node, "toggled", toggled_probe)
-	if target_node is CheckBox or target_node is CheckButton:
+	if button == MOUSE_BUTTON_LEFT and (target_node is CheckBox or target_node is CheckButton):
 		if not pressed_fired and not toggled_fired:
 			target_node.grab_click_focus()
 			target_node.set_pressed(not target_node.button_pressed)
@@ -517,11 +936,76 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 		_trace_action_finished("click", {"target": str(target), "button": button})
 		return
 
-	if target_node is BaseButton and not pressed_fired:
+	if button == MOUSE_BUTTON_LEFT and target_node is BaseButton and not pressed_fired:
 		target_node.grab_click_focus()
 		target_node.pressed.emit()
 		await wait_frames(1)
 	_trace_action_finished("click", {"target": str(target), "button": button})
+
+
+func dblclick(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
+	_trace_action_started("dblclick", {"target": str(target), "button": button})
+	var target_node := node(target)
+	if not _ensure_control_enabled("dblclick", target_node, target):
+		return
+
+	var position := _resolve_position(target)
+	if position == null:
+		_record_failure("Could not resolve dblclick target: %s" % str(target))
+		return
+
+	mouse_move(position)
+	await wait_frames(1)
+	await _mouse_click_cycle(position, button, false, target_node)
+	await wait_frames(1)
+	await _mouse_click_cycle(position, button, true, target_node)
+	await wait_frames(1)
+	_trace_action_finished("dblclick", {"target": str(target), "button": button})
+
+
+func right_click(target: Variant) -> void:
+	_trace_action_started("right_click", {"target": str(target)})
+	var target_node := node(target)
+	if not _ensure_control_enabled("right_click", target_node, target):
+		return
+	var position := _resolve_position(target)
+	if position == null:
+		_record_failure("Could not resolve right_click target: %s" % str(target))
+		return
+
+	mouse_move(position)
+	await wait_frames(1)
+	await _mouse_click_cycle(position, MOUSE_BUTTON_RIGHT, false, target_node)
+	await wait_frames(1)
+	_trace_action_finished("right_click", {"target": str(target)})
+
+
+func long_press(target: Variant, hold_frames := 12, button := MOUSE_BUTTON_LEFT) -> void:
+	_trace_action_started("long_press", {
+		"target": str(target),
+		"hold_frames": int(hold_frames),
+		"button": int(button),
+	})
+	var target_node := node(target)
+	if not _ensure_control_enabled("long_press", target_node, target):
+		return
+
+	var position := _resolve_position(target)
+	if position == null:
+		_record_failure("Could not resolve long_press target: %s" % str(target))
+		return
+
+	mouse_move(position)
+	await wait_frames(1)
+	_dispatch_pointer_button(target_node, position, button, true)
+	await wait_frames(max(int(hold_frames), 1))
+	_dispatch_pointer_button(target_node, position, button, false)
+	await wait_frames(1)
+	_trace_action_finished("long_press", {
+		"target": str(target),
+		"hold_frames": int(hold_frames),
+		"button": int(button),
+	})
 
 
 func hover(target: Variant) -> void:
@@ -791,12 +1275,13 @@ func mouse_move(position: Vector2) -> void:
 	last_mouse_position = position
 
 
-func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: bool = true) -> void:
+func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: bool = true, double_click := false) -> void:
 	var event := InputEventMouseButton.new()
 	event.position = position
 	event.global_position = position
 	event.button_index = button
 	event.pressed = pressed
+	event.double_click = bool(double_click)
 	Input.parse_input_event(event)
 	last_mouse_position = position
 
@@ -2217,6 +2702,97 @@ func _resolve_optional_position(target: Variant = null) -> Vector2:
 	return position if position != null else last_mouse_position
 
 
+func _wait_signal_frame(physics: bool) -> void:
+	if physics:
+		await wait_physics_frames(1)
+		return
+	await wait_frames(1)
+
+
+func _wait_for_signal_match(
+	wait_kind: String,
+	target: Variant,
+	signal_name: String,
+	max_frames: int,
+	physics: bool,
+	matcher: Callable,
+	message: String
+) -> Dictionary:
+	_trace_event("wait_started", {
+		"message": message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": int(max_frames),
+		"wait_kind": wait_kind,
+		"physics": physics,
+	})
+	var target_node := node(target)
+	if target_node == null:
+		_record_failure("%s() could not resolve target: %s" % [wait_kind, str(target)])
+		return {"fired": false, "args": [], "count": 0, "history": []}
+	if not target_node.has_signal(signal_name):
+		_record_failure("%s() target has no signal %s: %s" % [wait_kind, signal_name, str(target)])
+		return {"fired": false, "args": [], "count": 0, "history": []}
+
+	var probe := _connect_signal_probe(target_node, signal_name)
+	if probe == null:
+		_record_failure("%s() could not watch signal %s: %s" % [wait_kind, signal_name, str(target)])
+		return {"fired": false, "args": [], "count": 0, "history": []}
+
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for signal %s on %s" % [signal_name, str(target)]
+
+	var matched_args: Array = _matching_signal_args(probe, matcher)
+	if matched_args.is_empty():
+		for _frame in range(max(int(max_frames), 0)):
+			await _wait_signal_frame(physics)
+			matched_args = _matching_signal_args(probe, matcher)
+			if not matched_args.is_empty():
+				break
+
+	var history := _duplicate_signal_history(probe.history)
+	var received := not matched_args.is_empty()
+	_disconnect_signal_probe(target_node, signal_name, probe)
+	_trace_event("wait_finished" if received else "wait_timed_out", {
+		"message": wait_message,
+		"signal_name": signal_name,
+		"target": str(target),
+		"max_frames": int(max_frames),
+		"wait_kind": wait_kind,
+		"physics": physics,
+		"args": matched_args.duplicate(),
+		"count": probe.count,
+		"history": history,
+	})
+	if not received:
+		_record_failure(wait_message)
+
+	return {
+		"fired": received,
+		"args": matched_args.duplicate(),
+		"count": probe.count,
+		"history": history,
+	}
+
+
+func _matching_signal_args(probe: SignalProbe, matcher: Callable) -> Array:
+	if probe == null:
+		return []
+	for entry in probe.history:
+		var args := entry as Array
+		if matcher.call(args):
+			return args.duplicate()
+	return []
+
+
+func _duplicate_signal_history(history: Array) -> Array:
+	var duplicated: Array = []
+	for entry in history:
+		duplicated.append((entry as Array).duplicate())
+	return duplicated
+
+
 func _joy_input_key(device: int, input_code: int) -> String:
 	return "%d:%d" % [device, input_code]
 
@@ -2239,6 +2815,30 @@ func _disconnect_signal_probe(target: Object, signal_name: String, probe: Signal
 	if target.is_connected(signal_name, callable):
 		target.disconnect(signal_name, callable)
 	return probe.fired
+
+
+func _mouse_click_cycle(position: Vector2, button: int, double_click := false, target_node: Node = null) -> void:
+	_dispatch_pointer_button(target_node, position, button, true, double_click)
+	await wait_frames(1)
+	_dispatch_pointer_button(target_node, position, button, false, double_click)
+
+
+func _dispatch_pointer_button(
+	target_node: Node,
+	position: Vector2,
+	button: int,
+	pressed: bool,
+	double_click := false
+) -> void:
+	mouse_button(position, button, pressed, double_click)
+	if target_node is Control:
+		var event := InputEventMouseButton.new()
+		event.position = position
+		event.global_position = position
+		event.button_index = button
+		event.pressed = pressed
+		event.double_click = bool(double_click)
+		target_node.gui_input.emit(event)
 
 
 func _accessibility_snapshot(target_node: Node) -> Dictionary:
