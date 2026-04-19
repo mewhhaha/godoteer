@@ -123,4 +123,6 @@ Useful waited locator assertions:
 
 Preferred queries stay accessibility-first: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.
 
+Exact query and assertion matches use raw Godot strings. Godoteer does not trim edge whitespace for visible text, labels, placeholders, `accessibility_name`, or `accessibility_description`. Fuzzy matching still uses case-insensitive substring checks.
+
 `locator.capture(file_name)` now saves cropped PNGs for visible `Control` targets in windowed runs. `screen.screenshot(file_name)` stays full-screen. `screen.capture_camera(camera, file_name)` captures from a specific `Camera2D` or `Camera3D`.

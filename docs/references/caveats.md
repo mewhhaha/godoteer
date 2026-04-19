@@ -12,6 +12,8 @@
 - `get_by_text()` matches visible rendered text only.
 - `get_by_placeholder_text()` only checks textbox placeholder text.
 - `get_by_label_text()` is pragmatic Godot version, not full browser-label model.
+- Exact text, label, placeholder, and accessibility comparisons do not trim edge whitespace.
+- Fuzzy text-style matching still uses case-insensitive substring behavior.
 
 ## Strict Cardinality
 

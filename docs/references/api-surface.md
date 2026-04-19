@@ -136,6 +136,8 @@ Semantics:
 - `get_*`: fail on zero or multiple, no waiting
 - `query_*`: `null` on zero, fail on multiple, no waiting
 - `find_*`: wait up to timeout and fail on timeout
+- exact matching compares raw Godot strings with no edge trimming
+- non-exact matching uses case-insensitive substring checks
 
 ## `GodoteerLocator`
 
@@ -181,6 +183,8 @@ Waited assertions:
 - `await to_be_unchecked(timeout_sec = 2.0)`
 - `await to_have_accessible_name(expected, timeout_sec = 2.0)`
 - `await to_have_accessible_description(expected, timeout_sec = 2.0)`
+
+Exact text and accessibility assertions compare raw strings as Godot exposes them. Leading spaces, trailing spaces, and trailing newlines stay significant.
 
 Current instant helpers still available:
 
