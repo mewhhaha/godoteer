@@ -117,6 +117,14 @@ func is_enabled(path_or_node: Variant) -> bool:
 
 func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	var target_node := node(target)
+	if target_node is CheckBox or target_node is CheckButton:
+		target_node.grab_focus()
+		target_node.button_pressed = not target_node.button_pressed
+		target_node.toggled.emit(target_node.button_pressed)
+		target_node.pressed.emit()
+		await wait_frames(1)
+		return
+
 	if target_node is BaseButton:
 		target_node.grab_focus()
 		target_node.pressed.emit()
@@ -183,6 +191,7 @@ func fill(target: Variant, text: String) -> void:
 	if target_node is TextEdit:
 		target_node.grab_focus()
 		target_node.text = text
+		target_node.text_changed.emit()
 		await wait_frames(1)
 		return
 

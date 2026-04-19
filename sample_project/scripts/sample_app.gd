@@ -3,6 +3,7 @@ extends Control
 @onready var status_label: Label = $FormPanel/StatusLabel
 @onready var action_button: Button = $FormPanel/ActionButton
 @onready var name_input: LineEdit = $FormPanel/NameRow/NameInput
+@onready var notes_input: TextEdit = $FormPanel/NotesRow/NotesInput
 @onready var terms_toggle: CheckBox = $FormPanel/TermsToggle
 @onready var role_select: OptionButton = $FormPanel/RoleSelect
 @onready var hidden_message: Label = $FormPanel/HiddenMessage
@@ -21,6 +22,7 @@ func _ready() -> void:
 	dismiss_notice_button.pressed.connect(_on_dismiss_notice_pressed)
 	name_input.focus_entered.connect(_on_name_focus_entered)
 	name_input.focus_exited.connect(_on_name_focus_exited)
+	notes_input.text_changed.connect(_on_notes_changed)
 	terms_toggle.mouse_entered.connect(_on_terms_mouse_entered)
 	drag_handle.gui_input.connect(_on_drag_handle_gui_input)
 	drop_zone.gui_input.connect(_on_drop_zone_gui_input)
@@ -49,6 +51,10 @@ func _on_name_focus_exited() -> void:
 
 func _on_terms_mouse_entered() -> void:
 	status_label.text = "Hover Terms"
+
+
+func _on_notes_changed() -> void:
+	status_label.text = "Notes: %s" % notes_input.text
 
 
 func _on_drag_handle_gui_input(event: InputEvent) -> void:

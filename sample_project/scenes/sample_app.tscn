@@ -36,6 +36,19 @@ size_flags_horizontal = 3
 placeholder_text = "Enter hero name"
 accessibility_description = "Type player name before starting"
 
+[node name="NotesRow" type="HBoxContainer" parent="FormPanel"]
+layout_mode = 2
+
+[node name="NotesLabel" type="Label" parent="FormPanel/NotesRow"]
+layout_mode = 2
+text = "Notes"
+
+[node name="NotesInput" type="TextEdit" parent="FormPanel/NotesRow"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+size_flags_horizontal = 3
+accessibility_description = "Type freeform notes"
+
 [node name="TermsToggle" type="CheckBox" parent="FormPanel"]
 layout_mode = 2
 text = "Accept Terms"
