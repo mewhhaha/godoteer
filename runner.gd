@@ -36,8 +36,11 @@ func _boot() -> void:
 		_fatal("No test files found\n%s" % _usage_text(), EXIT_FAIL)
 		return
 
-	run_stats["suites_total"] = suite_paths.size()
-	print("GodoteerGD start %d %s" % [suite_paths.size(), _pluralize("suite", "suites", suite_paths.size())])
+	if str(config["grep"]) == "":
+		run_stats["suites_total"] = suite_paths.size()
+	else:
+		run_stats["suites_total"] = _count_runnable_suites(suite_paths, str(config["grep"]))
+	print("GodoteerGD start %d %s" % [int(run_stats["suites_total"]), _pluralize("suite", "suites", int(run_stats["suites_total"]))])
 
 	var had_failures := false
 	for suite_path in suite_paths:
@@ -367,6 +370,38 @@ func _format_duration(duration_msec: int) -> String:
 	if duration_msec < 1000:
 		return "%dms" % duration_msec
 	return "%.2fs" % (float(duration_msec) / 1000.0)
+
+
+func _count_runnable_suites(suite_paths: PackedStringArray, grep_text: String) -> int:
+	if grep_text == "":
+		return 0
+
+	var total := 0
+	for suite_path in suite_paths:
+		if _is_runnable_suite(suite_path, grep_text):
+			total += 1
+	return total
+
+
+func _is_runnable_suite(suite_path: String, grep_text: String) -> bool:
+	var script: Script = load(suite_path)
+	if script == null:
+		return true
+
+	var test_case = script.new()
+	if test_case == null:
+		return true
+
+	var is_scene_test := test_case is GodoteerSceneTest
+	var is_unit_test := test_case is GodoteerTest
+	if not is_scene_test and not is_unit_test:
+		return true
+
+	var all_test_methods: PackedStringArray = test_case.list_tests()
+	if all_test_methods.is_empty():
+		return true
+
+	return not _filter_test_methods(all_test_methods, suite_path, grep_text).is_empty()
 
 
 func _filter_test_methods(test_methods: PackedStringArray, suite_path: String, grep_text: String) -> PackedStringArray:
