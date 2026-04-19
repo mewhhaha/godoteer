@@ -22,6 +22,7 @@ offset_bottom = 220.0
 layout_mode = 2
 text = "Idle"
 accessibility_description = "Current sample status"
+accessibility_live = 1
 
 [node name="WhitespaceLabel" type="Label" parent="FormPanel"]
 layout_mode = 2
@@ -38,7 +39,13 @@ text = "Player Name"
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Enter hero name"
-accessibility_description = "Type player name before starting"
+accessibility_labeled_by_nodes = [NodePath("../NameLabel")]
+accessibility_described_by_nodes = [NodePath("../../NameHelp")]
+accessibility_flow_to_nodes = [NodePath("../../TermsToggle")]
+
+[node name="NameHelp" type="Label" parent="FormPanel"]
+layout_mode = 2
+text = "Type player name before starting"
 
 [node name="NotesRow" type="HBoxContainer" parent="FormPanel"]
 layout_mode = 2
@@ -51,6 +58,7 @@ text = "Notes"
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2
 size_flags_horizontal = 3
+accessibility_labeled_by_nodes = [NodePath("../NotesLabel")]
 accessibility_description = "Type freeform notes"
 
 [node name="TermsToggle" type="CheckBox" parent="FormPanel"]
@@ -109,6 +117,7 @@ layout_mode = 2
 text = "Start"
 accessibility_name = "Start"
 accessibility_description = "Starts sample flow"
+accessibility_controls_nodes = [NodePath("../StatusLabel")]
 
 [node name="WhitespaceButton" type="Button" parent="FormPanel"]
 layout_mode = 2

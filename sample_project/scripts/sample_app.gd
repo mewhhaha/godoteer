@@ -25,6 +25,7 @@ func _ready() -> void:
 	name_input.text_submitted.connect(_on_name_submitted)
 	notes_input.text_changed.connect(_on_notes_changed)
 	terms_toggle.mouse_entered.connect(_on_terms_mouse_entered)
+	role_select.item_selected.connect(_on_role_selected)
 	drag_handle.gui_input.connect(_on_drag_handle_gui_input)
 	drop_zone.gui_input.connect(_on_drop_zone_gui_input)
 
@@ -60,6 +61,10 @@ func _on_name_submitted(text: String) -> void:
 
 func _on_notes_changed() -> void:
 	status_label.text = "Notes: %s" % notes_input.text
+
+
+func _on_role_selected(index: int) -> void:
+	status_label.text = "Role: %s" % role_select.get_item_text(index)
 
 
 func _on_drag_handle_gui_input(event: InputEvent) -> void:

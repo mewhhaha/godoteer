@@ -18,6 +18,34 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/smoke_test.gd
 ```
 
+Headless accessibility inspection scene test:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/accessibility_inspection_test.gd
+```
+
+Headless gameplay scene test:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/gameplay_test.gd
+```
+
+Headless deterministic simulation scene test:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/simulation_test.gd
+```
+
+Headless low-level input scene test:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/input_matrix_test.gd
+```
+
 Filtered run with JUnit output:
 
 ```bash
@@ -47,6 +75,13 @@ godot --headless --path sample_project --script addons/godoteer/screen.gd --chec
 godot --headless --path sample_project --script addons/godoteer/runner.gd --check-only
 godot --headless --path sample_project --script tests/unit/basic_test.gd --check-only
 godot --headless --path sample_project --script tests/scene/smoke_test.gd --check-only
+godot --headless --path sample_project --script tests/scene/accessibility_inspection_test.gd --check-only
+godot --headless --path sample_project --script scripts/gameplay_input_probe.gd --check-only
+godot --headless --path sample_project --script tests/scene/gameplay_test.gd --check-only
+godot --headless --path sample_project --script scripts/simulation_probe.gd --check-only
+godot --headless --path sample_project --script tests/scene/simulation_test.gd --check-only
+godot --headless --path sample_project --script scripts/input_matrix_probe.gd --check-only
+godot --headless --path sample_project --script tests/scene/input_matrix_test.gd --check-only
 ```
 
 Validate docs skill:
@@ -73,4 +108,5 @@ python3 /home/mewhhaha/.codex/skills/.system/skill-creator/scripts/quick_validat
 
 - Use headless for unit suites, scene logic, and directory runs
 - Use windowed when verifying screenshot behavior
+- Use windowed for native accessibility-element checks if a test asserts `has_accessibility_element() == true`
 - Headless mode should report `screen.can_screenshot() == false`

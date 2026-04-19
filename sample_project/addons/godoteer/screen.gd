@@ -8,15 +8,33 @@ class SignalProbe:
 	extends RefCounted
 
 	var fired := false
+	var args: Array = []
+	var arg_count := 0
 
-	func mark(_arg1 = null, _arg2 = null, _arg3 = null, _arg4 = null) -> void:
+	func mark(
+		_arg1 = null,
+		_arg2 = null,
+		_arg3 = null,
+		_arg4 = null,
+		_arg5 = null,
+		_arg6 = null,
+		_arg7 = null,
+		_arg8 = null
+	) -> void:
 		fired = true
+		var values := [_arg1, _arg2, _arg3, _arg4, _arg5, _arg6, _arg7, _arg8]
+		args = values.slice(0, min(arg_count, values.size()))
 
 var tree: SceneTree
 var app_root: Node
 var failure_sink: Object
 var artifacts_dir := "user://artifacts"
 var last_mouse_position := Vector2.ZERO
+var pressed_actions: Dictionary = {}
+var pressed_keys: Dictionary = {}
+var pressed_joy_buttons: Dictionary = {}
+var joy_axis_values: Dictionary = {}
+var active_touches: Dictionary = {}
 
 
 func _init(scene_tree: SceneTree, root_node: Node, sink: Object, artifacts_path: String = "user://artifacts") -> void:
@@ -35,6 +53,11 @@ func wait_seconds(seconds: float) -> void:
 	await tree.create_timer(max(seconds, 0.0)).timeout
 
 
+func wait_physics_frames(count: int = 1) -> void:
+	for _i in range(max(count, 1)):
+		await tree.physics_frame
+
+
 func wait_until(predicate: Callable, timeout_sec: float = 2.0, step_frames: int = 1, message: String = "Condition timed out") -> bool:
 	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
 	while Time.get_ticks_msec() <= deadline:
@@ -44,6 +67,209 @@ func wait_until(predicate: Callable, timeout_sec: float = 2.0, step_frames: int 
 
 	_record_failure(message)
 	return false
+
+
+func wait_until_frames(predicate: Callable, max_frames := 120, message: String = "Condition timed out") -> bool:
+	if predicate.call():
+		return true
+
+	for _i in range(max(int(max_frames), 0)):
+		await wait_frames(1)
+		if predicate.call():
+			return true
+
+	_record_failure(message)
+	return false
+
+
+func wait_until_physics(predicate: Callable, max_frames := 120, message: String = "Condition timed out") -> bool:
+	if predicate.call():
+		return true
+
+	for _i in range(max(int(max_frames), 0)):
+		await wait_physics_frames(1)
+		if predicate.call():
+			return true
+
+	_record_failure(message)
+	return false
+
+
+func wait_for_signal(target: Variant, signal_name: String, timeout_sec: float = 2.0, message: String = "") -> bool:
+	var target_node := node(target)
+	if target_node == null:
+		_record_failure("wait_for_signal() could not resolve target: %s" % str(target))
+		return false
+	if not target_node.has_signal(signal_name):
+		_record_failure("wait_for_signal() target has no signal %s: %s" % [signal_name, str(target)])
+		return false
+
+	var probe := _connect_signal_probe(target_node, signal_name)
+	if probe == null:
+		_record_failure("wait_for_signal() could not watch signal %s: %s" % [signal_name, str(target)])
+		return false
+
+	var timeout_message := message
+	if timeout_message == "":
+		timeout_message = "Timed out waiting for signal %s on %s" % [signal_name, str(target)]
+
+	var received := await wait_until(
+		func() -> bool:
+			return probe.fired,
+		timeout_sec,
+		1,
+		timeout_message
+	)
+	_disconnect_signal_probe(target_node, signal_name, probe)
+	return received
+
+
+func next_signal(
+	target: Variant,
+	signal_name: String,
+	max_frames := 120,
+	physics := false,
+	message: String = ""
+) -> Dictionary:
+	var target_node := node(target)
+	if target_node == null:
+		_record_failure("next_signal() could not resolve target: %s" % str(target))
+		return {"fired": false, "args": []}
+	if not target_node.has_signal(signal_name):
+		_record_failure("next_signal() target has no signal %s: %s" % [signal_name, str(target)])
+		return {"fired": false, "args": []}
+
+	var probe := _connect_signal_probe(target_node, signal_name)
+	if probe == null:
+		_record_failure("next_signal() could not watch signal %s: %s" % [signal_name, str(target)])
+		return {"fired": false, "args": []}
+
+	var wait_message := message
+	if wait_message == "":
+		wait_message = "Timed out waiting for signal %s on %s" % [signal_name, str(target)]
+
+	var received := false
+	if physics:
+		received = await wait_until_physics(
+			func() -> bool:
+				return probe.fired,
+			max_frames,
+			wait_message
+		)
+	else:
+		received = await wait_until_frames(
+			func() -> bool:
+				return probe.fired,
+			max_frames,
+			wait_message
+		)
+
+	_disconnect_signal_probe(target_node, signal_name, probe)
+	return {
+		"fired": received,
+		"args": probe.args.duplicate(),
+	}
+
+
+func pause_scene() -> void:
+	tree.paused = true
+
+
+func resume_scene() -> void:
+	tree.paused = false
+
+
+func set_time_scale(scale: float) -> void:
+	if scale <= 0.0:
+		_record_failure("set_time_scale() requires scale > 0.0: %s" % scale)
+		return
+	Engine.time_scale = scale
+
+
+func action_press(action_name: String, strength: float = 1.0) -> void:
+	if not _ensure_action_exists("action_press", action_name):
+		return
+
+	Input.action_press(action_name, strength)
+	pressed_actions[action_name] = true
+
+
+func action_release(action_name: String) -> void:
+	if not _ensure_action_exists("action_release", action_name):
+		return
+
+	Input.action_release(action_name)
+	pressed_actions.erase(action_name)
+
+
+func action_tap(action_name: String, hold_frames: int = 1, strength: float = 1.0) -> void:
+	if not _ensure_action_exists("action_tap", action_name):
+		return
+
+	action_press(action_name, strength)
+	await wait_physics_frames(max(hold_frames, 1))
+	action_release(action_name)
+
+
+func key_press(keycode: Key) -> void:
+	var press := InputEventKey.new()
+	press.keycode = keycode
+	press.pressed = true
+	Input.parse_input_event(press)
+	pressed_keys[keycode] = true
+
+
+func key_release(keycode: Key) -> void:
+	var release := InputEventKey.new()
+	release.keycode = keycode
+	release.pressed = false
+	Input.parse_input_event(release)
+	pressed_keys.erase(keycode)
+
+
+func joy_button_press(button, device := 0) -> void:
+	var event := InputEventJoypadButton.new()
+	event.device = int(device)
+	event.button_index = int(button)
+	event.pressed = true
+	event.pressure = 1.0
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	pressed_joy_buttons[_joy_input_key(int(device), int(button))] = true
+
+
+func joy_button_release(button, device := 0) -> void:
+	var event := InputEventJoypadButton.new()
+	event.device = int(device)
+	event.button_index = int(button)
+	event.pressed = false
+	event.pressure = 0.0
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	pressed_joy_buttons.erase(_joy_input_key(int(device), int(button)))
+
+
+func joy_button_tap(button, hold_frames := 1, device := 0) -> void:
+	joy_button_press(button, device)
+	await wait_physics_frames(max(int(hold_frames), 1))
+	joy_button_release(button, device)
+	await wait_frames(1)
+
+
+func joy_axis_set(axis, value: float, device := 0) -> void:
+	var clamped_value := clampf(value, -1.0, 1.0)
+	var event := InputEventJoypadMotion.new()
+	event.device = int(device)
+	event.axis = int(axis)
+	event.axis_value = clamped_value
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	joy_axis_values[_joy_input_key(int(device), int(axis))] = clamped_value
+
+
+func joy_axis_reset(axis, device := 0) -> void:
+	joy_axis_set(axis, 0.0, device)
+	joy_axis_values.erase(_joy_input_key(int(device), int(axis)))
 
 
 func node(path_or_node: Variant) -> Node:
@@ -231,13 +457,20 @@ func clear(target: Variant) -> void:
 
 func press(target: Variant, keycode: Key) -> void:
 	var target_node := node(target)
+	var submitted_probe := _connect_signal_probe(target_node, "text_submitted")
 	if target_node is Control:
 		if not _ensure_control_enabled("press", target_node, target):
+			_disconnect_signal_probe(target_node, "text_submitted", submitted_probe)
 			return
 		if not _ensure_text_input_editable("press", target_node, target):
+			_disconnect_signal_probe(target_node, "text_submitted", submitted_probe)
 			return
 		target_node.grab_focus()
 	await key_tap(keycode)
+	var submitted := _disconnect_signal_probe(target_node, "text_submitted", submitted_probe)
+	if target_node is LineEdit and not submitted and (keycode == KEY_ENTER or keycode == KEY_KP_ENTER):
+		target_node.text_submitted.emit(target_node.text)
+		await wait_frames(1)
 
 
 func drag_to(source: Variant, target_or_position: Variant, duration_sec: float = 0.2, steps: int = 12) -> void:
@@ -322,16 +555,60 @@ func select_option(target: Variant, option_text: String) -> void:
 	if target_node is OptionButton:
 		if not _ensure_control_enabled("select_option", target_node, target):
 			return
-		for index in range(target_node.item_count):
-			if target_node.get_item_text(index) == option_text:
-				target_node.select(index)
-				target_node.item_selected.emit(index)
-				await wait_frames(1)
+		var option_button: OptionButton = target_node
+		var option_index := _option_button_item_index(option_button, option_text)
+		if option_index < 0:
+			_record_failure("Option not found for select_option(): %s on %s" % [option_text, str(target)])
+			return
+
+		var popup := _option_button_popup(option_button)
+		if popup == null:
+			_record_failure("select_option() could not resolve popup for %s" % str(target))
+			return
+
+		await click(target)
+		if not await _wait_for_popup_visible(popup):
+			option_button.show_popup()
+			if not await _wait_for_popup_visible(popup):
+				_record_failure("select_option() could not open popup for %s" % str(target))
 				return
-		_record_failure("Option not found for select_option(): %s on %s" % [option_text, str(target)])
+
+		var previous_index := option_button.selected
+		popup.set_focused_item(option_index)
+		var activate_event := InputEventMouseButton.new()
+		activate_event.button_index = MOUSE_BUTTON_LEFT
+		activate_event.pressed = false
+		var activated := popup.activate_item_by_event(activate_event)
+		await wait_frames(1)
+		if option_button.selected == option_index:
+			return
+
+		if not activated:
+			popup.index_pressed.emit(option_index)
+			await wait_frames(1)
+		if option_button.selected == option_index:
+			return
+
+		_record_failure("select_option() could not activate option %s on %s previous=%s actual=%s" % [
+			option_text,
+			str(target),
+			previous_index,
+			option_button.selected,
+		])
 		return
 
 	_record_failure("select_option() supports OptionButton only: %s" % str(target))
+
+
+func mouse_move_relative(delta: Vector2) -> void:
+	var next_position := last_mouse_position + delta
+	var event := InputEventMouseMotion.new()
+	event.position = next_position
+	event.global_position = next_position
+	event.relative = delta
+	event.screen_relative = delta
+	Input.parse_input_event(event)
+	last_mouse_position = next_position
 
 
 func mouse_move(position: Vector2) -> void:
@@ -350,6 +627,18 @@ func mouse_button(position: Vector2, button: int = MOUSE_BUTTON_LEFT, pressed: b
 	event.pressed = pressed
 	Input.parse_input_event(event)
 	last_mouse_position = position
+
+
+func mouse_wheel(vertical_steps: int, horizontal_steps := 0, target: Variant = null) -> void:
+	var position := _resolve_optional_position(target)
+	for _step in range(abs(vertical_steps)):
+		var button := MOUSE_BUTTON_WHEEL_UP if vertical_steps > 0 else MOUSE_BUTTON_WHEEL_DOWN
+		mouse_button(position, button, true)
+		await wait_frames(1)
+	for _step in range(abs(horizontal_steps)):
+		var button := MOUSE_BUTTON_WHEEL_RIGHT if horizontal_steps > 0 else MOUSE_BUTTON_WHEEL_LEFT
+		mouse_button(position, button, true)
+		await wait_frames(1)
 
 
 func move_mouse_between(
@@ -384,18 +673,116 @@ func move_mouse_to(
 	await move_mouse_between(last_mouse_position, to_position, duration_sec, steps)
 
 
-func key_tap(keycode: Key) -> void:
-	var press := InputEventKey.new()
-	press.keycode = keycode
-	press.pressed = true
-	Input.parse_input_event(press)
-
-	var release := InputEventKey.new()
-	release.keycode = keycode
-	release.pressed = false
-	Input.parse_input_event(release)
-
+func key_tap(keycode: Key, hold_frames := 1) -> void:
+	key_press(keycode)
+	await wait_frames(max(int(hold_frames), 1))
+	key_release(keycode)
 	await wait_frames(1)
+
+
+func touch_press(position: Vector2, index := 0) -> void:
+	var event := InputEventScreenTouch.new()
+	event.index = int(index)
+	event.position = position
+	event.pressed = true
+	Input.parse_input_event(event)
+	active_touches[int(index)] = position
+
+
+func touch_move(position: Vector2, index := 0) -> void:
+	var touch_index := int(index)
+	var previous_position: Vector2 = active_touches.get(touch_index, position)
+	var event := InputEventScreenDrag.new()
+	event.index = touch_index
+	event.position = position
+	event.relative = position - previous_position
+	event.screen_relative = event.relative
+	Input.parse_input_event(event)
+	active_touches[touch_index] = position
+
+
+func touch_release(position: Vector2, index := 0) -> void:
+	var event := InputEventScreenTouch.new()
+	event.index = int(index)
+	event.position = position
+	event.pressed = false
+	Input.parse_input_event(event)
+	active_touches.erase(int(index))
+
+
+func touch_tap(position: Vector2, index := 0, hold_frames := 1) -> void:
+	touch_press(position, index)
+	await wait_frames(max(int(hold_frames), 1))
+	touch_release(position, index)
+	await wait_frames(1)
+
+
+func touch_drag(from: Vector2, to: Vector2, index := 0, duration_sec := 0.2, steps := 12) -> void:
+	touch_press(from, index)
+	var safe_steps: int = max(int(steps), 1)
+	var safe_duration: float = max(float(duration_sec), 0.0)
+	var delay_sec: float = safe_duration / float(safe_steps)
+	for step in range(1, safe_steps + 1):
+		var weight := float(step) / float(safe_steps)
+		touch_move(from.lerp(to, weight), index)
+		if delay_sec > 0.0:
+			await tree.create_timer(delay_sec).timeout
+		else:
+			await wait_frames(1)
+	touch_release(to, index)
+	await wait_frames(1)
+
+
+func touch_pinch(
+	start_a: Vector2,
+	start_b: Vector2,
+	end_a: Vector2,
+	end_b: Vector2,
+	duration_sec := 0.2,
+	steps := 12,
+	index_a := 0,
+	index_b := 1
+) -> void:
+	touch_press(start_a, index_a)
+	touch_press(start_b, index_b)
+	var safe_steps: int = max(int(steps), 1)
+	var safe_duration: float = max(float(duration_sec), 0.0)
+	var delay_sec: float = safe_duration / float(safe_steps)
+	for step in range(1, safe_steps + 1):
+		var weight := float(step) / float(safe_steps)
+		touch_move(start_a.lerp(end_a, weight), index_a)
+		touch_move(start_b.lerp(end_b, weight), index_b)
+		if delay_sec > 0.0:
+			await tree.create_timer(delay_sec).timeout
+		else:
+			await wait_frames(1)
+	touch_release(end_a, index_a)
+	touch_release(end_b, index_b)
+	await wait_frames(1)
+
+
+func release_all_actions() -> void:
+	release_all_inputs()
+
+
+func release_all_inputs() -> void:
+	for action_name in pressed_actions.keys():
+		Input.action_release(str(action_name))
+	pressed_actions.clear()
+	for keycode in pressed_keys.keys():
+		key_release(int(keycode))
+	pressed_keys.clear()
+	for joy_key in pressed_joy_buttons.keys():
+		var parts := str(joy_key).split(":")
+		joy_button_release(int(parts[1]), int(parts[0]))
+	pressed_joy_buttons.clear()
+	for axis_key in joy_axis_values.keys():
+		var parts := str(axis_key).split(":")
+		joy_axis_reset(int(parts[1]), int(parts[0]))
+	joy_axis_values.clear()
+	for touch_index in active_touches.keys():
+		touch_release(active_touches[touch_index], int(touch_index))
+	active_touches.clear()
 
 
 func screenshot(file_name: String = "screenshot.png") -> String:
@@ -498,6 +885,26 @@ func accessible_description(target: Variant) -> String:
 	return _accessible_description(node(target))
 
 
+func accessibility_rid(target: Variant) -> RID:
+	var target_node := node(target)
+	if target_node == null:
+		return RID()
+	return target_node.get_accessibility_element()
+
+
+func has_accessibility_element(target: Variant) -> bool:
+	return _accessibility_rid_valid(accessibility_rid(target))
+
+
+func accessibility_snapshot(target: Variant) -> Dictionary:
+	return _accessibility_snapshot(node(target))
+
+
+func accessibility_tree(root_target: Variant = null, options: Dictionary = {}) -> Dictionary:
+	var include_hidden := bool(options.get("include_hidden", false))
+	return _accessibility_tree_for_node(_query_root(root_target), include_hidden)
+
+
 func expect_accessible_name(target: Variant, expected: String, message: String = "") -> void:
 	var actual := accessible_name(target)
 	if actual != expected:
@@ -511,6 +918,21 @@ func expect_accessible_description(target: Variant, expected: String, message: S
 	if actual != expected:
 		if message == "":
 			message = "Accessible description mismatch expected=%s actual=%s" % [expected, actual]
+		_record_failure(message)
+
+
+func expect_has_accessibility_element(target: Variant, message: String = "") -> void:
+	if not has_accessibility_element(target):
+		if message == "":
+			message = "Expected accessibility element to exist: %s" % str(target)
+		_record_failure(message)
+
+
+func expect_accessibility_role(target: Variant, expected: String, message: String = "") -> void:
+	var actual := str(accessibility_snapshot(target).get("role", ""))
+	if actual != expected:
+		if message == "":
+			message = "Accessibility role mismatch expected=%s actual=%s" % [expected, actual]
 		_record_failure(message)
 
 
@@ -688,8 +1110,13 @@ func _build_node_name_query(method_name: String, name: String, root_target: Vari
 func _normalize_query_options(options: Dictionary) -> Dictionary:
 	return {
 		"name": str(options.get("name", "")),
+		"description": str(options.get("description", "")),
 		"exact": bool(options.get("exact", true)),
 		"include_hidden": bool(options.get("include_hidden", false)),
+		"checked": bool(options.get("checked", false)),
+		"has_checked": options.has("checked"),
+		"disabled": bool(options.get("disabled", false)),
+		"has_disabled": options.has("disabled"),
 	}
 
 
@@ -814,6 +1241,20 @@ func _role_matches(candidate: Node, query: Dictionary) -> bool:
 	if _node_role(candidate) != str(query.get("role", "")):
 		return false
 
+	var wanted_description := str(query["options"]["description"])
+	if wanted_description != "":
+		if not _string_matches(_accessible_description(candidate), wanted_description, bool(query["options"]["exact"])):
+			return false
+
+	if bool(query["options"]["has_checked"]):
+		var checked_state = _checked_state(candidate)
+		if checked_state == null or checked_state != bool(query["options"]["checked"]):
+			return false
+
+	if bool(query["options"]["has_disabled"]):
+		if _is_accessibility_disabled(candidate) != bool(query["options"]["disabled"]):
+			return false
+
 	var wanted_name := str(query["options"]["name"])
 	if wanted_name == "":
 		return true
@@ -847,9 +1288,13 @@ func _accessible_name(candidate: Node) -> String:
 	if candidate == null or not candidate is Control:
 		return ""
 
-	var explicit := _get_string_property(candidate, "accessibility_name")
+	var explicit := _string_from_method(candidate, "get_accessibility_name")
 	if explicit != "":
 		return explicit
+
+	var relation_label := _relation_text(candidate, "accessibility_labeled_by_nodes")
+	if relation_label != "":
+		return relation_label
 
 	if _supports_text_accessible_name(candidate):
 		return _visible_text(candidate)
@@ -864,14 +1309,22 @@ func _accessible_description(candidate: Node) -> String:
 	if candidate == null or not candidate is Control:
 		return ""
 
-	return _get_string_property(candidate, "accessibility_description")
+	var explicit := _string_from_method(candidate, "get_accessibility_description")
+	if explicit != "":
+		return explicit
+
+	return _relation_text(candidate, "accessibility_described_by_nodes")
 
 
 func _label_text(candidate: Node) -> String:
 	if candidate == null or not candidate is Control:
 		return ""
 
-	var direct_label := _get_string_property(candidate, "accessibility_name")
+	var direct_relation_label := _relation_text(candidate, "accessibility_labeled_by_nodes")
+	if direct_relation_label != "":
+		return direct_relation_label
+
+	var direct_label := _string_from_method(candidate, "get_accessibility_name")
 	if direct_label != "":
 		return direct_label
 
@@ -976,6 +1429,25 @@ func _is_textbox(candidate: Node) -> bool:
 	return candidate is LineEdit or candidate is TextEdit
 
 
+func _checked_state(candidate: Node):
+	if candidate is CheckBox or candidate is CheckButton:
+		return bool(candidate.button_pressed)
+	return null
+
+
+func _is_accessibility_disabled(candidate: Node) -> bool:
+	if not candidate is Control:
+		return false
+
+	if _has_property(candidate, "disabled") and bool(candidate.get("disabled")):
+		return true
+
+	if (candidate is LineEdit or candidate is TextEdit) and _has_property(candidate, "editable") and not bool(candidate.get("editable")):
+		return true
+
+	return false
+
+
 func _is_hidden(candidate: Node) -> bool:
 	return candidate is CanvasItem and not candidate.is_visible_in_tree()
 
@@ -1076,11 +1548,55 @@ func _ensure_text_input_editable(action_name: String, target_node: Node, origina
 	return true
 
 
+func _ensure_action_exists(action_name: String, input_action: String) -> bool:
+	if InputMap.has_action(input_action):
+		return true
+
+	_record_failure("%s() unknown action: %s" % [action_name, input_action])
+	return false
+
+
+func _option_button_popup(option_button: OptionButton) -> PopupMenu:
+	return option_button.get_popup()
+
+
+func _option_button_item_index(option_button: OptionButton, option_text: String) -> int:
+	for index in range(option_button.item_count):
+		if option_button.get_item_text(index) == option_text:
+			return index
+	return -1
+
+
+func _wait_for_popup_visible(popup: PopupMenu, timeout_sec: float = 0.2) -> bool:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while Time.get_ticks_msec() <= deadline:
+		if popup.visible:
+			return true
+		await wait_frames(1)
+	return popup.visible
+
+
+func _resolve_optional_position(target: Variant = null) -> Vector2:
+	if target == null:
+		return last_mouse_position
+	if target is Vector2:
+		return target
+	if target is Vector2i:
+		return Vector2(target)
+	var position := _resolve_position(target)
+	return position if position != null else last_mouse_position
+
+
+func _joy_input_key(device: int, input_code: int) -> String:
+	return "%d:%d" % [device, input_code]
+
+
 func _connect_signal_probe(target: Object, signal_name: String) -> SignalProbe:
 	if target == null or not target.has_signal(signal_name):
 		return null
 
 	var probe := SignalProbe.new()
+	probe.arg_count = _signal_arg_count(target, signal_name)
 	target.connect(signal_name, Callable(probe, "mark"))
 	return probe
 
@@ -1093,6 +1609,140 @@ func _disconnect_signal_probe(target: Object, signal_name: String, probe: Signal
 	if target.is_connected(signal_name, callable):
 		target.disconnect(signal_name, callable)
 	return probe.fired
+
+
+func _accessibility_snapshot(target_node: Node) -> Dictionary:
+	if target_node == null:
+		return {}
+
+	return {
+		"node_path": str(target_node.get_path()),
+		"node_name": target_node.name,
+		"rid_valid": has_accessibility_element(target_node),
+		"role": _node_role(target_node),
+		"name": _accessible_name(target_node),
+		"description": _accessible_description(target_node),
+		"contextual_info": _accessibility_contextual_info(target_node),
+		"value": node_value(target_node),
+		"placeholder": _placeholder_text(target_node),
+		"disabled": _is_accessibility_disabled(target_node),
+		"checked": _checked_state(target_node),
+		"hidden": _is_hidden(target_node),
+		"live": _accessibility_live(target_node),
+		"labeled_by": _related_node_paths(target_node, "accessibility_labeled_by_nodes"),
+		"described_by": _related_node_paths(target_node, "accessibility_described_by_nodes"),
+		"controls": _related_node_paths(target_node, "accessibility_controls_nodes"),
+		"flow_to": _related_node_paths(target_node, "accessibility_flow_to_nodes"),
+	}
+
+
+func _accessibility_tree_for_node(target_node: Node, include_hidden: bool) -> Dictionary:
+	if target_node == null:
+		return {}
+
+	var children: Array = []
+	for child in target_node.get_children():
+		var child_tree := _accessibility_tree_for_node(child, include_hidden)
+		if not child_tree.is_empty():
+			children.append(child_tree)
+
+	if not _should_include_accessibility_tree_node(target_node, include_hidden):
+		if children.is_empty():
+			return {}
+		return {
+			"node_path": str(target_node.get_path()),
+			"node_name": target_node.name,
+			"rid_valid": false,
+			"role": "",
+			"name": "",
+			"description": "",
+			"contextual_info": "",
+			"value": null,
+			"placeholder": "",
+			"disabled": false,
+			"checked": null,
+			"hidden": _is_hidden(target_node),
+			"live": 0,
+			"labeled_by": [],
+			"described_by": [],
+			"controls": [],
+			"flow_to": [],
+			"children": children,
+		}
+
+	var snapshot := _accessibility_snapshot(target_node)
+	snapshot["children"] = children
+	return snapshot
+
+
+func _should_include_accessibility_tree_node(target_node: Node, include_hidden: bool) -> bool:
+	if target_node == null:
+		return false
+	if not include_hidden and _is_hidden(target_node):
+		return false
+	return target_node is Control or target_node is Window
+
+
+func _accessibility_rid_valid(rid: RID) -> bool:
+	return rid.is_valid() and DisplayServer.accessibility_has_element(rid)
+
+
+func _accessibility_contextual_info(candidate: Node) -> String:
+	if candidate == null or not candidate is Control or not candidate.has_method("_accessibility_get_contextual_info"):
+		return ""
+
+	var value = candidate.call("_accessibility_get_contextual_info")
+	return str(value) if value is String else ""
+
+
+func _accessibility_live(candidate: Node) -> int:
+	if candidate == null or not candidate is Control or not _has_property(candidate, "accessibility_live"):
+		return 0
+	return int(candidate.get("accessibility_live"))
+
+
+func _relation_text(candidate: Node, property_name: String) -> String:
+	var parts: Array[String] = []
+	for related_node in _related_nodes(candidate, property_name):
+		var text := _visible_text(related_node)
+		if text != "":
+			parts.append(text)
+	return " ".join(parts)
+
+
+func _related_node_paths(candidate: Node, property_name: String) -> Array[String]:
+	var paths: Array[String] = []
+	for related_node in _related_nodes(candidate, property_name):
+		paths.append(str(related_node.get_path()))
+	return paths
+
+
+func _related_nodes(candidate: Node, property_name: String) -> Array:
+	var related: Array = []
+	if candidate == null or not candidate is Control:
+		return related
+
+	for relation_path in _get_array_property(candidate, property_name):
+		if relation_path is NodePath:
+			var related_node := candidate.get_node_or_null(relation_path)
+			if related_node != null:
+				related.append(related_node)
+
+	return related
+
+
+func _signal_arg_count(target: Object, signal_name: String) -> int:
+	if target == null:
+		return 0
+
+	for signal_info in target.get_signal_list():
+		if str(signal_info.get("name", "")) != signal_name:
+			continue
+
+		var args = signal_info.get("args", [])
+		return args.size() if args is Array else 0
+
+	return 0
 
 
 func _get_string_property(target: Object, property_name: String) -> String:
@@ -1109,7 +1759,31 @@ func _get_string_property(target: Object, property_name: String) -> String:
 	return ""
 
 
+func _get_array_property(target: Object, property_name: String) -> Array:
+	if target == null:
+		return []
+
+	for property_info in target.get_property_list():
+		if str(property_info.get("name", "")) != property_name:
+			continue
+
+		var value = target.get(property_name)
+		return value if value is Array else []
+
+	return []
+
+
+func _string_from_method(target: Object, method_name: String) -> String:
+	if target == null or not target.has_method(method_name):
+		return ""
+
+	var value = target.call(method_name)
+	return str(value) if value is String else ""
+
+
 func _node_role(candidate: Node) -> String:
+	if candidate is Window:
+		return "window"
 	if candidate is CheckBox or candidate is CheckButton:
 		return "checkbox"
 	if candidate is OptionButton:

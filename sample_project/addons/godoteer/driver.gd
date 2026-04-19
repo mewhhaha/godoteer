@@ -34,9 +34,13 @@ func screen(scene_ref: Variant) -> GodoteerScreen:
 
 
 func close_screen() -> void:
+	if current_screen != null:
+		current_screen.release_all_inputs()
+	_restore_runtime_state()
 	current_screen = null
 
 	if current_app_root == null:
+		_restore_runtime_state()
 		return
 
 	if tree.current_scene == current_app_root:
@@ -71,3 +75,8 @@ func _record_failure(message: String) -> void:
 		failure_sink.record_failure(message)
 	else:
 		printerr(message)
+
+
+func _restore_runtime_state() -> void:
+	tree.paused = false
+	Engine.time_scale = 1.0

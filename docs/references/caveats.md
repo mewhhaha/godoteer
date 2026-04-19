@@ -5,13 +5,18 @@
 - Preferred query surface is accessibility-first, not implementation-first.
 - Role queries match accessible name, not node name.
 - Accessible name currently uses:
-  - `accessibility_name` first
+  - `get_accessibility_name()` first
+  - explicit `accessibility_labeled_by_nodes`
   - visible text for controls that naturally expose text
   - associated label text for pragmatic form layouts
   - never `Node.name`
+- Accessible description currently uses:
+  - `get_accessibility_description()` first
+  - explicit `accessibility_described_by_nodes`
 - `get_by_text()` matches visible rendered text only.
 - `get_by_placeholder_text()` only checks textbox placeholder text.
-- `get_by_label_text()` is pragmatic Godot version, not full browser-label model.
+- `get_by_label_text()` prefers explicit label relations, then falls back to pragmatic Godot layout heuristics.
+- Role queries can filter by accessible `description`, `checked`, and `disabled` state.
 - Exact text, label, placeholder, and accessibility comparisons do not trim edge whitespace.
 - Fuzzy text-style matching still uses case-insensitive substring behavior.
 
@@ -50,8 +55,16 @@
 - Semantic actions still honor disabled controls and do not force activation.
 - `fill()` and `press()` also refuse non-editable text inputs.
 - Headless Godot may skip some GUI dispatch paths, so Godoteer keeps limited internal fallback to preserve deterministic smoke coverage.
-- `select_option()` is still semantic; popup-navigation fidelity is not implemented yet.
+- `select_option()` uses `OptionButton` popup flow with popup-level fallback in headless mode.
 - This improves trust for common UI interactions, but is not full trace or record/replay coverage.
+
+## Simulation Control
+
+- `wait_until_frames()` and `wait_until_physics()` use frame budgets, not wall-clock seconds.
+- `next_signal()` can capture signal payload args and poll on process or physics frames.
+- `pause_scene()` relies on `SceneTree.paused`; nodes configured to keep processing while paused may still run.
+- `set_time_scale()` changes engine-global `Engine.time_scale` during active scene tests.
+- Driver reset restores `SceneTree.paused = false` and `Engine.time_scale = 1.0`.
 
 ## Failure Model
 
@@ -62,6 +75,13 @@
 
 ## Missing Features
 
-- No DOM-like accessibility tree traversal APIs.
+- No full OS accessibility tree dump or assistive-tech emulation APIs.
 - No image diff assertions.
 - No trace or record/replay support.
+- Low-level input helpers synthesize Godot events; they are not platform-native HID integration.
+
+## Accessibility Inspection
+
+- `accessibility_snapshot()` and `accessibility_tree()` are node-backed semantic views, not raw platform accessibility readback.
+- `rid_valid` and `has_accessibility_element()` reflect native accessibility element availability and may differ between headless and windowed runs.
+- Explicit accessibility support is forced on in sample project so debug tools and tests can inspect accessibility metadata without a live screen reader.

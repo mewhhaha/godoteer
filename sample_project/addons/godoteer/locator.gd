@@ -292,6 +292,20 @@ func to_have_accessible_description(expected: String, timeout_sec: float = 2.0) 
 	)
 
 
+func to_have_accessibility_role(expected: String, timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return str(screen.accessibility_snapshot(self).get("role", "")) == expected,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for accessibility role on %s expected=%s actual=%s" % [
+				description,
+				expected,
+				str(screen.accessibility_snapshot(self).get("role", "")),
+			]
+	)
+
+
 func within() -> GodoteerLocator:
 	return screen.within(self)
 

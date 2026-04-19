@@ -98,6 +98,8 @@ func test_click_updates_visible_text_with_find(driver: GodoteerDriver) -> void:
 	await terms_toggle.to_be_checked()
 	await role_select.select_option("Rogue")
 	await role_select.to_have_value("Rogue")
+	await status.to_have_text("Role: Rogue")
+	await name_field.focus()
 	await name_field.press(KEY_ENTER)
 	await status.to_have_text("Submitted: Mew")
 	await screen.move_mouse_between(Vector2(0, 0), Vector2(120, 120), 0.05, 6)
@@ -201,6 +203,22 @@ func test_disabled_controls_block_actions(driver: GodoteerDriver) -> void:
 	expect(name_field.value() == "", "Non-editable fill should not change text input value", name_field.value())
 	expect(terms_toggle.value() == false, "Disabled checkbox actions should not change checked state", terms_toggle.value())
 	expect(role_select.value() == "Mage", "Disabled select should not change current option", role_select.value())
+
+
+func test_select_option_records_failure_for_missing_option(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var form := screen.within(screen.get_by_node_name("FormPanel"))
+	var role_select := form.get_by_role("combobox", {"name": "Role"})
+
+	drain_failures()
+	set_failures_quiet(true)
+	await role_select.select_option("Paladin")
+	set_failures_quiet(false)
+	var failures := drain_failures()
+
+	expect(failures.size() == 1, "Missing option should record one failure", failures)
+	expect(str(failures[0]).contains("Option not found for select_option()"), "Missing option failure should explain lookup", failures)
+	expect(role_select.value() == "Mage", "Missing option should not change combobox value", role_select.value())
 
 
 func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:

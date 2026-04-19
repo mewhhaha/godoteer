@@ -62,6 +62,20 @@ godot --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/smoke_test.gd
 ```
 
+Run gameplay-focused scene test headless:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/gameplay_test.gd
+```
+
+Run deterministic simulation scene test headless:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/simulation_test.gd
+```
+
 Minimal unit suite:
 
 ```gdscript
@@ -90,6 +104,42 @@ func test_start_flow(driver: GodoteerDriver) -> void:
 	await screen.find_by_text("Started Mew / Pending / Mage")
 ```
 
+Gameplay action example:
+
+```gdscript
+extends "res://addons/godoteer/test_scene.gd"
+
+const GAMEPLAY_INPUT_PROBE := preload("res://scenes/gameplay_input_probe.tscn")
+
+func test_move_and_jump(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(GAMEPLAY_INPUT_PROBE)
+	var gameplay := screen.get_by_node_name("GameplayInputProbe").node()
+
+	screen.action_press("move_right")
+	await screen.wait_physics_frames(4)
+	screen.action_release("move_right")
+
+	screen.action_press("jump")
+	await screen.wait_for_signal(gameplay, "jumped")
+	screen.action_release("jump")
+```
+
+Deterministic simulation example:
+
+```gdscript
+extends "res://addons/godoteer/test_scene.gd"
+
+const SIMULATION_PROBE := preload("res://scenes/simulation_probe.tscn")
+
+func test_process_and_physics_progress(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SIMULATION_PROBE)
+	var probe := screen.get_by_node_name("SimulationProbe").node()
+
+	await screen.wait_until_frames(func() -> bool: return probe.process_count >= 3, 30)
+	var pulse := await screen.next_signal(probe, "physics_pulse", 30, true)
+	expect(pulse["fired"], "physics pulse should arrive")
+```
+
 Useful scene actions:
 - `await locator.fill(text)`
 - `await locator.clear()`
@@ -104,10 +154,33 @@ Useful scene actions:
 - `await locator.select_option(option_text)`
 - `await locator.capture(file_name)`
 - `await screen.capture_camera(camera, file_name)`
+- `screen.action_press(action_name, strength = 1.0)`
+- `screen.action_release(action_name)`
+- `await screen.action_tap(action_name, hold_frames = 1, strength = 1.0)`
+- `screen.key_press(keycode)`
+- `screen.key_release(keycode)`
+- `await screen.key_tap(keycode, hold_frames = 1)`
+- `screen.joy_button_press(button, device = 0)`
+- `screen.joy_button_release(button, device = 0)`
+- `await screen.joy_button_tap(button, hold_frames = 1, device = 0)`
+- `screen.joy_axis_set(axis, value, device = 0)`
+- `screen.joy_axis_reset(axis, device = 0)`
+- `screen.mouse_move_relative(delta)`
+- `await screen.mouse_wheel(vertical_steps, horizontal_steps = 0, target = null)`
+- `screen.touch_press(position, index = 0)`
+- `screen.touch_move(position, index = 0)`
+- `screen.touch_release(position, index = 0)`
+- `await screen.touch_tap(position, index = 0, hold_frames = 1)`
+- `await screen.touch_drag(from, to, index = 0, duration_sec = 0.2, steps = 12)`
+- `await screen.touch_pinch(start_a, start_b, end_a, end_b, duration_sec = 0.2, steps = 12, index_a = 0, index_b = 1)`
 
 Semantic actions still respect control state. Disabled controls refuse activation, and text entry helpers refuse non-editable `LineEdit` / `TextEdit` targets.
 
-Pointer and focus helpers prefer event-driven routing for `Control` targets, with limited internal fallback where headless Godot does not dispatch GUI input. `select_option()` still uses semantic selection in this tranche.
+Pointer and focus helpers prefer event-driven routing for `Control` targets, with limited internal fallback where headless Godot does not dispatch GUI input. `select_option()` now uses `OptionButton` popup flow with popup-level fallback for headless determinism.
+
+Prefer frame-budget waits for gameplay and simulation tests. `wait_seconds`, `wait_until(timeout_sec)`, and `wait_for_signal(timeout_sec)` stay available for wall-clock cases.
+
+Role queries also accept accessibility-state filters like `description`, `checked`, and `disabled`. Current matching stays node-backed and headless-friendly.
 
 Useful waited locator assertions:
 - `await locator.to_exist()`
@@ -124,9 +197,51 @@ Useful waited locator assertions:
 - `await locator.to_be_unchecked()`
 - `await locator.to_have_accessible_name(text)`
 - `await locator.to_have_accessible_description(text)`
+- `await locator.to_have_accessibility_role(role)`
+
+Useful timing helpers:
+- `await screen.wait_frames(count)`
+- `await screen.wait_physics_frames(count)`
+- `await screen.wait_seconds(seconds)`
+- `await screen.wait_until_frames(predicate, max_frames = 120)`
+- `await screen.wait_until_physics(predicate, max_frames = 120)`
+- `await screen.wait_until(predicate, timeout_sec = 2.0)`
+- `await screen.next_signal(target, signal_name, max_frames = 120, physics = false)`
+- `await screen.wait_for_signal(target, signal_name, timeout_sec = 2.0)`
+- `screen.pause_scene()`
+- `screen.resume_scene()`
+- `screen.set_time_scale(scale)`
+
+Low-level input example:
+
+```gdscript
+extends "res://addons/godoteer/test_scene.gd"
+
+const INPUT_MATRIX_PROBE := preload("res://scenes/input_matrix_probe.tscn")
+
+func test_raw_input(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(INPUT_MATRIX_PROBE)
+
+	screen.key_press(KEY_A)
+	await screen.wait_frames(1)
+	screen.key_release(KEY_A)
+	screen.joy_axis_set(JOY_AXIS_LEFT_X, 0.8)
+	await screen.mouse_wheel(1)
+	await screen.touch_tap(Vector2(32, 32))
+```
 
 Preferred queries stay accessibility-first: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.
 
 Exact query and assertion matches use raw Godot strings. Godoteer does not trim edge whitespace for visible text, labels, placeholders, `accessibility_name`, or `accessibility_description`. Fuzzy matching still uses case-insensitive substring checks.
+
+Accessibility inspection helpers:
+- `screen.accessibility_rid(target)`
+- `screen.has_accessibility_element(target)`
+- `screen.accessibility_snapshot(target)`
+- `screen.accessibility_tree(root_target = null, options = {})`
+- `screen.expect_has_accessibility_element(target)`
+- `screen.expect_accessibility_role(target, role)`
+
+`rid_valid` and `has_accessibility_element()` reflect native accessibility element availability. They may differ between headless and windowed runs even when query behavior stays the same.
 
 `locator.capture(file_name)` now saves cropped PNGs for visible `Control` targets in windowed runs. `screen.screenshot(file_name)` stays full-screen. `screen.capture_camera(camera, file_name)` captures from a specific `Camera2D` or `Camera3D`.
