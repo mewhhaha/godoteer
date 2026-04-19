@@ -124,6 +124,8 @@ Current support matrix:
 - `capture_camera`: `Camera2D`, `Camera3D`
 - activation actions honor disabled controls
 - text entry actions honor `editable = false` on `LineEdit` / `TextEdit`
+- pointer and focus helpers prefer real input/focus behavior for `Control` targets, with limited fallback when GUI dispatch does not fire
+- `select_option()` remains semantic rather than popup-navigation-driven
 
 Queries:
 

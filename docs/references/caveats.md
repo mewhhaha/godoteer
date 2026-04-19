@@ -46,11 +46,12 @@
 
 ## Click Model
 
-- `BaseButton` clicks are semantic, not fully physical.
-- Harness emits `pressed` directly after `grab_focus()`.
+- `click()`, `hover()`, `focus()`, `blur()`, and `drag_to()` prefer input/focus-system routing for `Control` targets.
 - Semantic actions still honor disabled controls and do not force activation.
 - `fill()` and `press()` also refuse non-editable text inputs.
-- This keeps button tests stable, but does not prove low-level pointer event routing.
+- Headless Godot may skip some GUI dispatch paths, so Godoteer keeps limited internal fallback to preserve deterministic smoke coverage.
+- `select_option()` is still semantic; popup-navigation fidelity is not implemented yet.
+- This improves trust for common UI interactions, but is not full trace or record/replay coverage.
 
 ## Failure Model
 

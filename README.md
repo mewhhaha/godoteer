@@ -107,6 +107,8 @@ Useful scene actions:
 
 Semantic actions still respect control state. Disabled controls refuse activation, and text entry helpers refuse non-editable `LineEdit` / `TextEdit` targets.
 
+Pointer and focus helpers prefer event-driven routing for `Control` targets, with limited internal fallback where headless Godot does not dispatch GUI input. `select_option()` still uses semantic selection in this tranche.
+
 Useful waited locator assertions:
 - `await locator.to_exist()`
 - `await locator.not_to_exist()`

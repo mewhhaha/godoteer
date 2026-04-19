@@ -3,6 +3,15 @@ class_name GodoteerScreen
 
 const GodoteerLocator = preload("locator.gd")
 
+
+class SignalProbe:
+	extends RefCounted
+
+	var fired := false
+
+	func mark(_arg1 = null, _arg2 = null, _arg3 = null, _arg4 = null) -> void:
+		fired = true
+
 var tree: SceneTree
 var app_root: Node
 var failure_sink: Object
@@ -120,22 +129,12 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	if not _ensure_control_enabled("click", target_node, target):
 		return
 
-	if target_node is CheckBox or target_node is CheckButton:
-		target_node.grab_focus()
-		target_node.button_pressed = not target_node.button_pressed
-		target_node.toggled.emit(target_node.button_pressed)
-		target_node.pressed.emit()
-		await wait_frames(1)
-		return
-
-	if target_node is BaseButton:
-		target_node.grab_focus()
-		target_node.pressed.emit()
-		await wait_frames(1)
-		return
-
+	var pressed_probe := _connect_signal_probe(target_node, "pressed")
+	var toggled_probe := _connect_signal_probe(target_node, "toggled")
 	var position := _resolve_position(target)
 	if position == null:
+		_disconnect_signal_probe(target_node, "pressed", pressed_probe)
+		_disconnect_signal_probe(target_node, "toggled", toggled_probe)
 		_record_failure("Could not resolve click target: %s" % str(target))
 		return
 
@@ -146,18 +145,35 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	mouse_button(position, button, false)
 	await wait_frames(1)
 
+	var pressed_fired := _disconnect_signal_probe(target_node, "pressed", pressed_probe)
+	var toggled_fired := _disconnect_signal_probe(target_node, "toggled", toggled_probe)
+	if target_node is CheckBox or target_node is CheckButton:
+		if not pressed_fired and not toggled_fired:
+			target_node.grab_click_focus()
+			target_node.set_pressed(not target_node.button_pressed)
+			await wait_frames(1)
+		return
+
+	if target_node is BaseButton and not pressed_fired:
+		target_node.grab_click_focus()
+		target_node.pressed.emit()
+		await wait_frames(1)
+
 
 func hover(target: Variant) -> void:
 	var target_node := node(target)
+	var hover_probe := _connect_signal_probe(target_node, "mouse_entered")
 	var position := _resolve_position(target)
 	if position == null:
+		_disconnect_signal_probe(target_node, "mouse_entered", hover_probe)
 		_record_failure("Could not resolve hover target: %s" % str(target))
 		return
 
 	mouse_move(position)
-	if target_node is Control:
-		target_node.mouse_entered.emit()
 	await wait_frames(1)
+	if target_node is Control and not _disconnect_signal_probe(target_node, "mouse_entered", hover_probe):
+		target_node.mouse_entered.emit()
+		await wait_frames(1)
 
 
 func focus(target: Variant) -> void:
@@ -166,7 +182,6 @@ func focus(target: Variant) -> void:
 		if not _ensure_control_enabled("focus", target_node, target):
 			return
 		target_node.grab_focus()
-		target_node.focus_entered.emit()
 		await wait_frames(1)
 		return
 
@@ -177,7 +192,6 @@ func blur(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is Control:
 		target_node.release_focus()
-		target_node.focus_exited.emit()
 		await wait_frames(1)
 		return
 
@@ -239,6 +253,9 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 	if not _ensure_control_enabled("drag_to", target_node, target_or_position, "target"):
 		return
 
+	var source_probe := _connect_signal_probe(source_node, "gui_input")
+	var target_hover_probe := _connect_signal_probe(target_node, "mouse_entered")
+	var target_probe := _connect_signal_probe(target_node, "gui_input")
 	mouse_move(from_position)
 	await wait_frames(1)
 	var press_event := InputEventMouseButton.new()
@@ -248,12 +265,14 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 	press_event.pressed = true
 	Input.parse_input_event(press_event)
 	last_mouse_position = from_position
-	if source_node is Control:
-		source_node.gui_input.emit(press_event)
 	await wait_frames(1)
+	if source_node is Control and not _disconnect_signal_probe(source_node, "gui_input", source_probe):
+		source_node.gui_input.emit(press_event)
+		await wait_frames(1)
 	await move_mouse_between(from_position, to_position, duration_sec, steps)
-	if target_node is Control:
+	if target_node is Control and not _disconnect_signal_probe(target_node, "mouse_entered", target_hover_probe):
 		target_node.mouse_entered.emit()
+		await wait_frames(1)
 	var release_event := InputEventMouseButton.new()
 	release_event.position = to_position
 	release_event.global_position = to_position
@@ -261,9 +280,10 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 	release_event.pressed = false
 	Input.parse_input_event(release_event)
 	last_mouse_position = to_position
-	if target_node is Control:
-		target_node.gui_input.emit(release_event)
 	await wait_frames(1)
+	if target_node is Control and not _disconnect_signal_probe(target_node, "gui_input", target_probe):
+		target_node.gui_input.emit(release_event)
+		await wait_frames(1)
 
 
 func check(target: Variant) -> void:
@@ -272,9 +292,7 @@ func check(target: Variant) -> void:
 		if not _ensure_control_enabled("check", target_node, target):
 			return
 		if not target_node.button_pressed:
-			target_node.button_pressed = true
-			target_node.toggled.emit(true)
-		await wait_frames(1)
+			await click(target)
 		return
 
 	_record_failure("check() supports CheckBox and CheckButton only: %s" % str(target))
@@ -286,9 +304,7 @@ func uncheck(target: Variant) -> void:
 		if not _ensure_control_enabled("uncheck", target_node, target):
 			return
 		if target_node.button_pressed:
-			target_node.button_pressed = false
-			target_node.toggled.emit(false)
-		await wait_frames(1)
+			await click(target)
 		return
 
 	_record_failure("uncheck() supports CheckBox and CheckButton only: %s" % str(target))
@@ -1058,6 +1074,25 @@ func _ensure_text_input_editable(action_name: String, target_node: Node, origina
 		_record_failure("%s() target is not editable: %s" % [action_name, str(original_target)])
 		return false
 	return true
+
+
+func _connect_signal_probe(target: Object, signal_name: String) -> SignalProbe:
+	if target == null or not target.has_signal(signal_name):
+		return null
+
+	var probe := SignalProbe.new()
+	target.connect(signal_name, Callable(probe, "mark"))
+	return probe
+
+
+func _disconnect_signal_probe(target: Object, signal_name: String, probe: SignalProbe) -> bool:
+	if target == null or probe == null:
+		return false
+
+	var callable := Callable(probe, "mark")
+	if target.is_connected(signal_name, callable):
+		target.disconnect(signal_name, callable)
+	return probe.fired
 
 
 func _get_string_property(target: Object, property_name: String) -> String:
