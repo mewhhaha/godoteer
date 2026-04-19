@@ -22,6 +22,7 @@ func _ready() -> void:
 	dismiss_notice_button.pressed.connect(_on_dismiss_notice_pressed)
 	name_input.focus_entered.connect(_on_name_focus_entered)
 	name_input.focus_exited.connect(_on_name_focus_exited)
+	name_input.text_submitted.connect(_on_name_submitted)
 	notes_input.text_changed.connect(_on_notes_changed)
 	terms_toggle.mouse_entered.connect(_on_terms_mouse_entered)
 	drag_handle.gui_input.connect(_on_drag_handle_gui_input)
@@ -51,6 +52,10 @@ func _on_name_focus_exited() -> void:
 
 func _on_terms_mouse_entered() -> void:
 	status_label.text = "Hover Terms"
+
+
+func _on_name_submitted(text: String) -> void:
+	status_label.text = "Submitted: %s" % text
 
 
 func _on_notes_changed() -> void:

@@ -67,6 +67,7 @@ func test_click_updates_visible_text_with_find(driver: GodoteerDriver) -> void:
 	await role_select.select_option("Rogue")
 	await role_select.to_have_value("Rogue")
 	await name_field.press(KEY_ENTER)
+	await status.to_have_text("Submitted: Mew")
 	await screen.move_mouse_between(Vector2(0, 0), Vector2(120, 120), 0.05, 6)
 	await start_button.click()
 
@@ -90,12 +91,17 @@ func test_checkbox_and_clear_actions(driver: GodoteerDriver) -> void:
 	await notes_field.fill("Journal")
 	await notes_field.to_have_value("Journal")
 	await status.to_have_text("Notes: Journal")
+	await notes_field.clear()
+	await notes_field.to_have_value("")
+	await status.to_have_text("Notes:")
 	await terms_toggle.click()
 	await terms_toggle.to_have_value(true)
 	await terms_toggle.check()
 	await terms_toggle.to_have_value(true)
 	await terms_toggle.uncheck()
 	await terms_toggle.to_have_value(false)
+	await terms_toggle.to_be_unchecked()
+	await terms_toggle.set_checked(false)
 	await terms_toggle.to_be_unchecked()
 
 
