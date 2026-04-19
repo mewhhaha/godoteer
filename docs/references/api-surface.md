@@ -77,8 +77,41 @@ File: `sample_project/addons/godoteer/screen.gd`
 Timing:
 
 - `await wait_frames(count = 1)`
+- `await wait_physics_frames(count = 1)`
 - `await wait_seconds(seconds)`
+- `await wait_until_frames(predicate, max_frames = 120, message = "Condition timed out")`
+- `await wait_until_physics(predicate, max_frames = 120, message = "Condition timed out")`
 - `await wait_until(predicate, timeout_sec = 2.0, step_frames = 1, message = "Condition timed out")`
+- `await next_signal(target, signal_name, max_frames = 120, physics = false, message = "")`
+- `await wait_for_signal(target, signal_name, timeout_sec = 2.0, message = "")`
+- `pause_scene()`
+- `resume_scene()`
+- `set_time_scale(scale)`
+
+Gameplay actions:
+
+- `action_press(action_name, strength = 1.0)`
+- `action_release(action_name)`
+- `await action_tap(action_name, hold_frames = 1, strength = 1.0)`
+
+Raw input:
+
+- `key_press(keycode)`
+- `key_release(keycode)`
+- `await key_tap(keycode, hold_frames = 1)`
+- `joy_button_press(button, device = 0)`
+- `joy_button_release(button, device = 0)`
+- `await joy_button_tap(button, hold_frames = 1, device = 0)`
+- `joy_axis_set(axis, value, device = 0)`
+- `joy_axis_reset(axis, device = 0)`
+- `mouse_move_relative(delta)`
+- `await mouse_wheel(vertical_steps, horizontal_steps = 0, target = null)`
+- `touch_press(position, index = 0)`
+- `touch_move(position, index = 0)`
+- `touch_release(position, index = 0)`
+- `await touch_tap(position, index = 0, hold_frames = 1)`
+- `await touch_drag(from, to, index = 0, duration_sec = 0.2, steps = 12)`
+- `await touch_pinch(start_a, start_b, end_a, end_b, duration_sec = 0.2, steps = 12, index_a = 0, index_b = 1)`
 
 Actions:
 
@@ -107,6 +140,21 @@ Node helpers:
 - `locator(target)`
 - `within(target)`
 
+Accessibility helpers:
+
+- `screen_reader_supported()`
+- `screen_reader_active()`
+- `accessible_name(target)`
+- `accessible_description(target)`
+- `accessibility_rid(target)`
+- `has_accessibility_element(target)`
+- `accessibility_snapshot(target)`
+- `accessibility_tree(root_target = null, options = {})`
+- `expect_accessible_name(target, expected, message = "")`
+- `expect_accessible_description(target, expected, message = "")`
+- `expect_has_accessibility_element(target, message = "")`
+- `expect_accessibility_role(target, expected, message = "")`
+
 Artifacts:
 
 - `screenshot(file_name = "screenshot.png")`
@@ -125,7 +173,11 @@ Current support matrix:
 - activation actions honor disabled controls
 - text entry actions honor `editable = false` on `LineEdit` / `TextEdit`
 - pointer and focus helpers prefer real input/focus behavior for `Control` targets, with limited fallback when GUI dispatch does not fire
-- `select_option()` remains semantic rather than popup-navigation-driven
+- `select_option()` uses `OptionButton` popup flow with popup-level fallback when GUI dispatch does not fire
+- gameplay action helpers target `InputMap` actions, not raw keycodes
+- raw keyboard, gamepad, mouse, and touch helpers are additive screen-level APIs
+- `pause_scene()` uses `SceneTree.paused`
+- `set_time_scale()` writes engine-global `Engine.time_scale`; driver reset restores `1.0`
 
 Queries:
 
@@ -140,6 +192,7 @@ Semantics:
 - `get_*`: fail on zero or multiple, no waiting
 - `query_*`: `null` on zero, fail on multiple, no waiting
 - `find_*`: wait up to timeout and fail on timeout
+- role query options support `name`, `description`, `checked`, `disabled`, `exact`, `include_hidden`
 - exact matching compares raw Godot strings with no edge trimming
 - non-exact matching uses case-insensitive substring checks
 
@@ -187,6 +240,7 @@ Waited assertions:
 - `await to_be_unchecked(timeout_sec = 2.0)`
 - `await to_have_accessible_name(expected, timeout_sec = 2.0)`
 - `await to_have_accessible_description(expected, timeout_sec = 2.0)`
+- `await to_have_accessibility_role(expected, timeout_sec = 2.0)`
 
 Exact text and accessibility assertions compare raw strings as Godot exposes them. Leading spaces, trailing spaces, and trailing newlines stay significant.
 

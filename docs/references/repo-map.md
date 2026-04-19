@@ -48,8 +48,34 @@ Branch model:
   - proves waited locator assertions including negative/state and accessibility helpers
   - proves cropped locator screenshots, camera-targeted capture, plus failure guard for hidden targets
 
+- `sample_project/tests/scene/accessibility_inspection_test.gd`
+  - proves relation-aware accessibility queries with `description`, `checked`, and `disabled`
+  - proves accessibility snapshots, accessibility tree inspection, and native accessibility element visibility
+
+- `sample_project/tests/scene/gameplay_test.gd`
+  - proves `action_press`, `action_release`, `action_tap`
+  - proves `wait_physics_frames` and `wait_for_signal`
+  - proves unknown action and signal-timeout failures
+
+- `sample_project/tests/scene/simulation_test.gd`
+  - proves deterministic frame-budget waits and `next_signal(...)` payload capture
+  - proves `pause_scene`, `resume_scene`, `set_time_scale`, and reset cleanup
+
+- `sample_project/tests/scene/input_matrix_test.gd`
+  - proves raw keyboard, joypad, mouse wheel, relative mouse, and touch helpers
+  - proves held-input cleanup across driver reset
+
 - `sample_project/scenes/sample_app.tscn`
-  - fixture scene with nested form row, textbox, checkbox, combobox, hidden/disabled/transient controls, drag widgets, button, and status text
+  - fixture scene with explicit accessibility label/description/control/flow relations plus nested form row, textbox, checkbox, combobox, hidden/disabled/transient controls, drag widgets, button, and status text
+
+- `sample_project/scenes/gameplay_input_probe.tscn`
+  - fixture scene for InputMap-driven gameplay movement and jump signal
+
+- `sample_project/scenes/simulation_probe.tscn`
+  - fixture scene for process/physics counters, delta sums, and signal payload timing
+
+- `sample_project/scenes/input_matrix_probe.tscn`
+  - fixture scene that records low-level input events in `_input(event)`
 
 ## Runtime Flow
 
