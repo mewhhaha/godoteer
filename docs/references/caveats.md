@@ -7,6 +7,7 @@
 - Accessible name currently uses:
   - `accessibility_name` first
   - visible text for controls that naturally expose text
+  - associated label text for pragmatic form layouts
   - never `Node.name`
 - `get_by_text()` matches visible rendered text only.
 - `get_by_placeholder_text()` only checks textbox placeholder text.
@@ -37,7 +38,9 @@
 - `Viewport.get_texture()` may be null in headless mode.
 - `screen.can_screenshot()` guards screenshot capture and should stay honest.
 - Use windowed runs for visual assertions.
-- `locator.capture(...)` currently uses full-screen capture, not element cropping.
+- `locator.capture(...)` crops visible `Control` targets only.
+- `screen.capture_camera(...)` captures full camera viewport, not cropped node regions.
+- Crop fails hard for hidden, unsupported, or offscreen targets.
 
 ## Click Model
 
@@ -55,6 +58,5 @@
 ## Missing Features
 
 - No DOM-like accessibility tree traversal APIs.
-- No cropped element screenshot assertion yet.
 - No image diff assertions.
 - No trace or record/replay support.

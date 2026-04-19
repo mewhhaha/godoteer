@@ -31,7 +31,7 @@ Branch model:
 - `driver.gd`
   - scene lifecycle owner
 - `screen.gd`
-  - queries, low-level actions, screenshot capture
+  - queries, low-level actions, viewport and camera capture
 - `locator.gd`
   - locator-first actions and waited assertions
 - `runner.gd`
@@ -45,16 +45,16 @@ Branch model:
 - `sample_project/tests/scene/smoke_test.gd`
   - proves accessibility-first queries
   - proves `fill`, `clear`, `hover`, `focus`, `blur`, `drag_to`, `check`, `uncheck`, `set_checked`, `select_option`
-  - proves waited locator assertions including negative/state helpers
-  - proves screenshot guard
+  - proves waited locator assertions including negative/state and accessibility helpers
+  - proves cropped locator screenshots, camera-targeted capture, plus failure guard for hidden targets
 
 - `sample_project/scenes/sample_app.tscn`
-  - fixture scene with textbox, checkbox, combobox, hidden/disabled/transient controls, drag widgets, button, and status text
+  - fixture scene with nested form row, textbox, checkbox, combobox, hidden/disabled/transient controls, drag widgets, button, and status text
 
 ## Runtime Flow
 
 1. Godot starts with `runner.gd` via `-s`
-2. Runner parses `--test` or `--dir`
+2. Runner parses `--test` or `--dir` plus optional `--grep` and `--junit`
 3. Runner loads suite files in sorted order
 4. Unit suites run directly; scene suites create one driver per suite
 5. Failures collect on suite object and also aggregate into grouped runner summary

@@ -41,6 +41,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/smoke_test.gd
 ```
 
+Run filtered tests or write JUnit:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --dir res://tests --grep drag --junit user://artifacts/junit/results.xml
+```
+
 Run whole test tree:
 
 ```bash
@@ -96,6 +103,7 @@ Useful scene actions:
 - `await locator.set_checked(bool)`
 - `await locator.select_option(option_text)`
 - `await locator.capture(file_name)`
+- `await screen.capture_camera(camera, file_name)`
 
 Useful waited locator assertions:
 - `await locator.to_exist()`
@@ -103,10 +111,16 @@ Useful waited locator assertions:
 - `await locator.to_have_text(text)`
 - `await locator.not_to_have_text(text)`
 - `await locator.to_have_value(value)`
+- `await locator.not_to_have_value(value)`
 - `await locator.to_be_visible()`
 - `await locator.to_be_hidden()`
 - `await locator.to_be_enabled()`
 - `await locator.to_be_disabled()`
 - `await locator.to_be_checked()`
+- `await locator.to_be_unchecked()`
+- `await locator.to_have_accessible_name(text)`
+- `await locator.to_have_accessible_description(text)`
 
 Preferred queries stay accessibility-first: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.
+
+`locator.capture(file_name)` now saves cropped PNGs for visible `Control` targets in windowed runs. `screen.screenshot(file_name)` stays full-screen. `screen.capture_camera(camera, file_name)` captures from a specific `Camera2D` or `Camera3D`.

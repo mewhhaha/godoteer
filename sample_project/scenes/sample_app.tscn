@@ -23,14 +23,17 @@ layout_mode = 2
 text = "Idle"
 accessibility_description = "Current sample status"
 
-[node name="NameLabel" type="Label" parent="FormPanel"]
+[node name="NameRow" type="HBoxContainer" parent="FormPanel"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="FormPanel/NameRow"]
 layout_mode = 2
 text = "Player Name"
 
-[node name="NameInput" type="LineEdit" parent="FormPanel"]
+[node name="NameInput" type="LineEdit" parent="FormPanel/NameRow"]
 layout_mode = 2
+size_flags_horizontal = 3
 placeholder_text = "Enter hero name"
-accessibility_name = "Player Name"
 accessibility_description = "Type player name before starting"
 
 [node name="TermsToggle" type="CheckBox" parent="FormPanel"]

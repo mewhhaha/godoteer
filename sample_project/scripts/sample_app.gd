@@ -2,7 +2,7 @@ extends Control
 
 @onready var status_label: Label = $FormPanel/StatusLabel
 @onready var action_button: Button = $FormPanel/ActionButton
-@onready var name_input: LineEdit = $FormPanel/NameInput
+@onready var name_input: LineEdit = $FormPanel/NameRow/NameInput
 @onready var terms_toggle: CheckBox = $FormPanel/TermsToggle
 @onready var role_select: OptionButton = $FormPanel/RoleSelect
 @onready var hidden_message: Label = $FormPanel/HiddenMessage
@@ -16,6 +16,7 @@ var dragging := false
 
 
 func _ready() -> void:
+	_build_camera_preview()
 	action_button.pressed.connect(_on_action_button_pressed)
 	dismiss_notice_button.pressed.connect(_on_dismiss_notice_pressed)
 	name_input.focus_entered.connect(_on_name_focus_entered)
@@ -59,3 +60,55 @@ func _on_drop_zone_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and dragging:
 		dragging = false
 		status_label.text = "Dropped"
+
+
+func _build_camera_preview() -> void:
+	if has_node("CameraPreviewViewport"):
+		return
+
+	var preview_viewport := SubViewport.new()
+	preview_viewport.name = "CameraPreviewViewport"
+	preview_viewport.size = Vector2i(120, 120)
+	preview_viewport.handle_input_locally = false
+	preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(preview_viewport)
+
+	var world_root := Node2D.new()
+	world_root.name = "CameraWorld"
+	preview_viewport.add_child(world_root)
+
+	var left_camera := Camera2D.new()
+	left_camera.name = "LeftCamera"
+	left_camera.position = Vector2.ZERO
+	world_root.add_child(left_camera)
+
+	var right_camera := Camera2D.new()
+	right_camera.name = "RightCamera"
+	right_camera.position = Vector2(120, 0)
+	world_root.add_child(right_camera)
+
+	var left_marker := Polygon2D.new()
+	left_marker.name = "LeftMarker"
+	left_marker.position = Vector2.ZERO
+	left_marker.color = Color(0.95, 0.2, 0.2, 1.0)
+	left_marker.polygon = PackedVector2Array([
+		Vector2(-40, -40),
+		Vector2(40, -40),
+		Vector2(40, 40),
+		Vector2(-40, 40),
+	])
+	world_root.add_child(left_marker)
+
+	var right_marker := Polygon2D.new()
+	right_marker.name = "RightMarker"
+	right_marker.position = Vector2(120, 0)
+	right_marker.color = Color(0.2, 0.4, 0.95, 1.0)
+	right_marker.polygon = PackedVector2Array([
+		Vector2(-40, -40),
+		Vector2(40, -40),
+		Vector2(40, 40),
+		Vector2(-40, 40),
+	])
+	world_root.add_child(right_marker)
+
+	left_camera.make_current()
