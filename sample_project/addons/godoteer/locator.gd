@@ -29,6 +29,33 @@ func click() -> void:
 	await screen.click(target)
 
 
+func hover() -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for hover: %s" % description)
+		return
+
+	await screen.hover(target)
+
+
+func focus() -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for focus: %s" % description)
+		return
+
+	await screen.focus(target)
+
+
+func blur() -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for blur: %s" % description)
+		return
+
+	await screen.blur(target)
+
+
 func fill(text: String) -> void:
 	var target := node()
 	if target == null:
@@ -51,6 +78,15 @@ func press(keycode: Key) -> void:
 	await screen.press(target, keycode)
 
 
+func drag_to(target_or_position: Variant, duration_sec: float = 0.2, steps: int = 12) -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for drag_to: %s" % description)
+		return
+
+	await screen.drag_to(target, target_or_position, duration_sec, steps)
+
+
 func check() -> void:
 	var target := node()
 	if target == null:
@@ -69,6 +105,15 @@ func uncheck() -> void:
 	await screen.uncheck(target)
 
 
+func set_checked(checked: bool) -> void:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for set_checked: %s" % description)
+		return
+
+	await screen.set_checked(target, checked)
+
+
 func select_option(option_text: String) -> void:
 	var target := node()
 	if target == null:
@@ -76,6 +121,15 @@ func select_option(option_text: String) -> void:
 		return
 
 	await screen.select_option(target, option_text)
+
+
+func capture(file_name: String = "locator.png") -> String:
+	var target := node()
+	if target == null:
+		screen.record_failure("Locator not found for capture: %s" % description)
+		return ""
+
+	return screen.capture_locator(target, file_name)
 
 
 func property(property_name: String):
@@ -99,52 +153,102 @@ func expect_text(expected: String, message: String = "") -> void:
 
 
 func to_exist(timeout_sec: float = 2.0) -> bool:
-	return await screen.wait_until(
+	return await _wait_for_condition(
 		func() -> bool:
 			return exists(),
 		timeout_sec,
-		1,
-		"Timed out waiting for locator to exist: %s" % description
+		func() -> String:
+			return "Timed out waiting for locator to exist: %s" % description
+	)
+
+
+func not_to_exist(timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return not exists(),
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for locator to stop existing: %s" % description
 	)
 
 
 func to_have_text(expected: String, timeout_sec: float = 2.0) -> bool:
-	return await screen.wait_until(
+	return await _wait_for_condition(
 		func() -> bool:
 			return text() == expected,
 		timeout_sec,
-		1,
-		"Timed out waiting for text on %s expected=%s actual=%s" % [description, expected, text()]
+		func() -> String:
+			return "Timed out waiting for text on %s expected=%s actual=%s" % [description, expected, text()]
+	)
+
+
+func not_to_have_text(expected: String, timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return text() != expected,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for text on %s to differ from %s actual=%s" % [description, expected, text()]
 	)
 
 
 func to_have_value(expected, timeout_sec: float = 2.0) -> bool:
-	return await screen.wait_until(
+	return await _wait_for_condition(
 		func() -> bool:
 			return value() == expected,
 		timeout_sec,
-		1,
-		"Timed out waiting for value on %s expected=%s actual=%s" % [description, var_to_str(expected), var_to_str(value())]
+		func() -> String:
+			return "Timed out waiting for value on %s expected=%s actual=%s" % [description, var_to_str(expected), var_to_str(value())]
 	)
 
 
 func to_be_visible(timeout_sec: float = 2.0) -> bool:
-	return await screen.wait_until(
+	return await _wait_for_condition(
 		func() -> bool:
 			return screen.is_visible(self),
 		timeout_sec,
-		1,
-		"Timed out waiting for %s to become visible" % description
+		func() -> String:
+			return "Timed out waiting for %s to become visible" % description
+	)
+
+
+func to_be_hidden(timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return not screen.is_visible(self),
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for %s to become hidden" % description
 	)
 
 
 func to_be_enabled(timeout_sec: float = 2.0) -> bool:
-	return await screen.wait_until(
+	return await _wait_for_condition(
 		func() -> bool:
 			return screen.is_enabled(self),
 		timeout_sec,
-		1,
-		"Timed out waiting for %s to become enabled" % description
+		func() -> String:
+			return "Timed out waiting for %s to become enabled" % description
+	)
+
+
+func to_be_disabled(timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return not screen.is_enabled(self),
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for %s to become disabled" % description
+	)
+
+
+func to_be_checked(timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return value() == true,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for %s to become checked actual=%s" % [description, var_to_str(value())]
 	)
 
 
@@ -238,3 +342,14 @@ func wait_for_text(expected: String, timeout_sec: float = 2.0, step_frames: int 
 		step_frames,
 		message if message != "" else "Timed out waiting for text %s on %s" % [expected, description]
 	)
+
+
+func _wait_for_condition(predicate: Callable, timeout_sec: float, message_builder: Callable) -> bool:
+	var deadline := Time.get_ticks_msec() + int(timeout_sec * 1000.0)
+	while Time.get_ticks_msec() <= deadline:
+		if predicate.call():
+			return true
+		await screen.wait_frames(1)
+
+	screen.record_failure(message_builder.call())
+	return false

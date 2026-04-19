@@ -51,6 +51,39 @@ selected = 0
 accessibility_name = "Role"
 accessibility_description = "Choose player role"
 
+[node name="HiddenMessage" type="Label" parent="FormPanel"]
+visible = false
+layout_mode = 2
+text = "Hidden Message"
+
+[node name="DisabledButton" type="Button" parent="FormPanel"]
+layout_mode = 2
+disabled = true
+text = "Disabled Action"
+
+[node name="TransientNotice" type="Label" parent="FormPanel"]
+layout_mode = 2
+text = "Transient Notice"
+
+[node name="DismissNoticeButton" type="Button" parent="FormPanel"]
+layout_mode = 2
+text = "Dismiss Notice"
+
+[node name="DragRow" type="HBoxContainer" parent="FormPanel"]
+layout_mode = 2
+
+[node name="DragHandle" type="ColorRect" parent="FormPanel/DragRow"]
+custom_minimum_size = Vector2(80, 32)
+layout_mode = 2
+color = Color(0.9, 0.5, 0.2, 1)
+mouse_filter = 1
+
+[node name="DropZone" type="ColorRect" parent="FormPanel/DragRow"]
+custom_minimum_size = Vector2(80, 32)
+layout_mode = 2
+color = Color(0.2, 0.7, 0.3, 1)
+mouse_filter = 1
+
 [node name="ActionButton" type="Button" parent="FormPanel"]
 layout_mode = 2
 text = "Start"

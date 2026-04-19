@@ -58,6 +58,7 @@ python3 /home/mewhhaha/.codex/skills/.system/skill-creator/scripts/quick_validat
 
 - Default artifact target: `user://artifacts`
 - scene failure screenshots save under `user://artifacts/failures/` when windowed capture is available
+- manual `locator.capture(...)` currently saves full-screen screenshots; no crop assertion yet
 
 ## Headless vs Windowed
 

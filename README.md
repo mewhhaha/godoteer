@@ -86,16 +86,27 @@ func test_start_flow(driver: GodoteerDriver) -> void:
 Useful scene actions:
 - `await locator.fill(text)`
 - `await locator.clear()`
+- `await locator.hover()`
+- `await locator.focus()`
+- `await locator.blur()`
+- `await locator.drag_to(target_or_position)`
 - `await locator.press(keycode)`
 - `await locator.check()`
 - `await locator.uncheck()`
+- `await locator.set_checked(bool)`
 - `await locator.select_option(option_text)`
+- `await locator.capture(file_name)`
 
 Useful waited locator assertions:
 - `await locator.to_exist()`
+- `await locator.not_to_exist()`
 - `await locator.to_have_text(text)`
+- `await locator.not_to_have_text(text)`
 - `await locator.to_have_value(value)`
 - `await locator.to_be_visible()`
+- `await locator.to_be_hidden()`
 - `await locator.to_be_enabled()`
+- `await locator.to_be_disabled()`
+- `await locator.to_be_checked()`
 
 Preferred queries stay accessibility-first: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.
