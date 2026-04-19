@@ -48,6 +48,8 @@
 
 - `BaseButton` clicks are semantic, not fully physical.
 - Harness emits `pressed` directly after `grab_focus()`.
+- Semantic actions still honor disabled controls and do not force activation.
+- `fill()` and `press()` also refuse non-editable text inputs.
 - This keeps button tests stable, but does not prove low-level pointer event routing.
 
 ## Failure Model

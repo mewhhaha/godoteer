@@ -122,6 +122,8 @@ Current support matrix:
 - `focus` / `blur`: `Control`
 - `capture_locator`: cropped PNG for visible `Control` targets only
 - `capture_camera`: `Camera2D`, `Camera3D`
+- activation actions honor disabled controls
+- text entry actions honor `editable = false` on `LineEdit` / `TextEdit`
 
 Queries:
 

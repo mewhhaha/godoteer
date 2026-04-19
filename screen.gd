@@ -110,13 +110,16 @@ func is_enabled(path_or_node: Variant) -> bool:
 	var target := node(path_or_node)
 	if target == null:
 		return false
-	if target is Control:
-		return not target.disabled
+	if target is Control and _has_property(target, "disabled"):
+		return not bool(target.get("disabled"))
 	return true
 
 
 func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	var target_node := node(target)
+	if not _ensure_control_enabled("click", target_node, target):
+		return
+
 	if target_node is CheckBox or target_node is CheckButton:
 		target_node.grab_focus()
 		target_node.button_pressed = not target_node.button_pressed
@@ -160,6 +163,8 @@ func hover(target: Variant) -> void:
 func focus(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is Control:
+		if not _ensure_control_enabled("focus", target_node, target):
+			return
 		target_node.grab_focus()
 		target_node.focus_entered.emit()
 		await wait_frames(1)
@@ -182,6 +187,10 @@ func blur(target: Variant) -> void:
 func fill(target: Variant, text: String) -> void:
 	var target_node := node(target)
 	if target_node is LineEdit:
+		if not _ensure_control_enabled("fill", target_node, target):
+			return
+		if not _ensure_text_input_editable("fill", target_node, target):
+			return
 		target_node.grab_focus()
 		target_node.text = text
 		target_node.text_changed.emit(text)
@@ -189,6 +198,10 @@ func fill(target: Variant, text: String) -> void:
 		return
 
 	if target_node is TextEdit:
+		if not _ensure_control_enabled("fill", target_node, target):
+			return
+		if not _ensure_text_input_editable("fill", target_node, target):
+			return
 		target_node.grab_focus()
 		target_node.text = text
 		target_node.text_changed.emit()
@@ -205,6 +218,10 @@ func clear(target: Variant) -> void:
 func press(target: Variant, keycode: Key) -> void:
 	var target_node := node(target)
 	if target_node is Control:
+		if not _ensure_control_enabled("press", target_node, target):
+			return
+		if not _ensure_text_input_editable("press", target_node, target):
+			return
 		target_node.grab_focus()
 	await key_tap(keycode)
 
@@ -216,6 +233,10 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 	var to_position := _resolve_position(target_or_position)
 	if from_position == null or to_position == null:
 		_record_failure("drag_to() could not resolve source or target: %s -> %s" % [str(source), str(target_or_position)])
+		return
+	if not _ensure_control_enabled("drag_to", source_node, source, "source"):
+		return
+	if not _ensure_control_enabled("drag_to", target_node, target_or_position, "target"):
 		return
 
 	mouse_move(from_position)
@@ -248,6 +269,8 @@ func drag_to(source: Variant, target_or_position: Variant, duration_sec: float =
 func check(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is CheckBox or target_node is CheckButton:
+		if not _ensure_control_enabled("check", target_node, target):
+			return
 		if not target_node.button_pressed:
 			target_node.button_pressed = true
 			target_node.toggled.emit(true)
@@ -260,6 +283,8 @@ func check(target: Variant) -> void:
 func uncheck(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is CheckBox or target_node is CheckButton:
+		if not _ensure_control_enabled("uncheck", target_node, target):
+			return
 		if target_node.button_pressed:
 			target_node.button_pressed = false
 			target_node.toggled.emit(false)
@@ -279,6 +304,8 @@ func set_checked(target: Variant, checked: bool) -> void:
 func select_option(target: Variant, option_text: String) -> void:
 	var target_node := node(target)
 	if target_node is OptionButton:
+		if not _ensure_control_enabled("select_option", target_node, target):
+			return
 		for index in range(target_node.item_count):
 			if target_node.get_item_text(index) == option_text:
 				target_node.select(index)
@@ -1017,6 +1044,20 @@ func _restore_camera(previous_camera, target_camera) -> void:
 			target_camera.set("enabled", false)
 		if _has_property(target_camera, "current"):
 			target_camera.set("current", false)
+
+
+func _ensure_control_enabled(action_name: String, target_node: Node, original_target: Variant, label: String = "target") -> bool:
+	if target_node is Control and _has_property(target_node, "disabled") and bool(target_node.get("disabled")):
+		_record_failure("%s() %s is disabled: %s" % [action_name, label, str(original_target)])
+		return false
+	return true
+
+
+func _ensure_text_input_editable(action_name: String, target_node: Node, original_target: Variant) -> bool:
+	if (target_node is LineEdit or target_node is TextEdit) and _has_property(target_node, "editable") and not bool(target_node.get("editable")):
+		_record_failure("%s() target is not editable: %s" % [action_name, str(original_target)])
+		return false
+	return true
 
 
 func _get_string_property(target: Object, property_name: String) -> String:
