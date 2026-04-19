@@ -153,6 +153,56 @@ func test_drag_and_negative_assertions(driver: GodoteerDriver) -> void:
 	await transient_notice.not_to_exist()
 
 
+func test_disabled_controls_block_actions(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var form := screen.within(screen.get_by_node_name("FormPanel"))
+	var status := form.get_by_node_name("StatusLabel")
+	var start_button := form.get_by_role("button", {"name": "Start"})
+	var name_field := form.get_by_role("textbox", {"name": "Player Name"})
+	var terms_toggle := form.get_by_role("checkbox", {"name": "Accept Terms"})
+	var role_select := form.get_by_role("combobox", {"name": "Role"})
+	var disabled_button := form.get_by_node_name("DisabledButton")
+
+	var start_button_node := start_button.node()
+	var name_field_node := name_field.node()
+	var terms_toggle_node := terms_toggle.node()
+	var role_select_node := role_select.node()
+
+	await name_field.focus()
+	await status.to_have_text("Focused Name")
+	start_button_node.disabled = true
+	name_field_node.editable = false
+	terms_toggle_node.disabled = true
+	role_select_node.disabled = true
+
+	drain_failures()
+	set_failures_quiet(true)
+	await start_button.click()
+	await disabled_button.focus()
+	await name_field.fill("Blocked")
+	await name_field.press(KEY_ENTER)
+	await terms_toggle.check()
+	await terms_toggle.uncheck()
+	await role_select.select_option("Warrior")
+	await disabled_button.hover()
+	await name_field.blur()
+	set_failures_quiet(false)
+	var failures := drain_failures()
+
+	expect(failures.size() == 7, "Disabled/non-editable action attempts should record seven failures", failures)
+	expect(str(failures[0]).contains("click() target is disabled"), "Disabled click should explain disabled target", failures)
+	expect(str(failures[1]).contains("focus() target is disabled"), "Disabled focus should explain disabled target", failures)
+	expect(str(failures[2]).contains("fill() target is not editable"), "Non-editable fill should explain non-editable target", failures)
+	expect(str(failures[3]).contains("press() target is not editable"), "Non-editable press should explain non-editable target", failures)
+	expect(str(failures[4]).contains("check() target is disabled"), "Disabled check should explain disabled target", failures)
+	expect(str(failures[5]).contains("uncheck() target is disabled"), "Disabled uncheck should explain disabled target", failures)
+	expect(str(failures[6]).contains("select_option() target is disabled"), "Disabled select should explain disabled target", failures)
+	expect(status.text() == "Blurred Name", "Disabled click or press should not change status beyond allowed blur", status.text())
+	expect(name_field.value() == "", "Non-editable fill should not change text input value", name_field.value())
+	expect(terms_toggle.value() == false, "Disabled checkbox actions should not change checked state", terms_toggle.value())
+	expect(role_select.value() == "Mage", "Disabled select should not change current option", role_select.value())
+
+
 func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
 	drain_failures()

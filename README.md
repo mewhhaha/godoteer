@@ -105,6 +105,8 @@ Useful scene actions:
 - `await locator.capture(file_name)`
 - `await screen.capture_camera(camera, file_name)`
 
+Semantic actions still respect control state. Disabled controls refuse activation, and text entry helpers refuse non-editable `LineEdit` / `TextEdit` targets.
+
 Useful waited locator assertions:
 - `await locator.to_exist()`
 - `await locator.not_to_exist()`
