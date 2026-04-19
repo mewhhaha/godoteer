@@ -1,6 +1,6 @@
 # Godoteer
 
-GDScript-first Godot test harness. Write fast unit tests with `test.gd` and scene automation tests with `test_scene.gd`.
+GDScript-first Godot test harness. Write fast unit tests with `test.gd`, scene automation tests with `test_scene.gd`, and run one file or a whole test directory with one runner.
 
 `dev` keeps source repo and sample project. `main` is published addon branch meant to clone into `res://addons/godoteer/`.
 
@@ -27,18 +27,25 @@ git pull
 
 ## Usage
 
-Run unit sample headless:
+Run one unit file headless:
 
 ```bash
 godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/unit/basic_test.gd
 ```
 
-Run scene smoke headless:
+Run one scene file headless:
 
 ```bash
 godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/smoke_test.gd
+```
+
+Run whole test tree:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --dir res://tests
 ```
 
 Run scene smoke windowed for screenshot coverage:
@@ -68,11 +75,27 @@ const SAMPLE_APP := preload("res://scenes/sample_app.tscn")
 
 func test_start_flow(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
+	var name_field := screen.get_by_role("textbox", {"name": "Player Name"})
 	var start_button := screen.get_by_role("button", {"name": "Start"})
 
-	screen.get_by_text("Idle").expect_exists()
+	await name_field.fill("Mew")
 	await start_button.click()
-	await screen.find_by_text("Started")
+	await screen.find_by_text("Started Mew / Pending / Mage")
 ```
+
+Useful scene actions:
+- `await locator.fill(text)`
+- `await locator.clear()`
+- `await locator.press(keycode)`
+- `await locator.check()`
+- `await locator.uncheck()`
+- `await locator.select_option(option_text)`
+
+Useful waited locator assertions:
+- `await locator.to_exist()`
+- `await locator.to_have_text(text)`
+- `await locator.to_have_value(value)`
+- `await locator.to_be_visible()`
+- `await locator.to_be_enabled()`
 
 Preferred queries stay accessibility-first: `get_by_role()`, `get_by_text()`, `get_by_label_text()`, `get_by_placeholder_text()`. Use `get_by_node_name()` only as implementation-detail escape hatch.

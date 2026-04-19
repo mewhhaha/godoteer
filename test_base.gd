@@ -57,6 +57,20 @@ func expect(condition: bool, ...details) -> void:
 		return
 
 	var parts: Array[String] = []
-	for detail in details:
-		parts.append(str(detail))
+	var index := 0
+	while index < details.size():
+		var detail = details[index]
+		var label := str(detail)
+		if label.ends_with("=") and index + 1 < details.size():
+			parts.append("%s %s" % [label, _format_detail(details[index + 1])])
+			index += 2
+			continue
+		parts.append(_format_detail(detail))
+		index += 1
 	record_failure("Expectation failed: %s" % " ".join(parts))
+
+
+func _format_detail(detail: Variant) -> String:
+	if detail is Array or detail is Dictionary:
+		return var_to_str(detail)
+	return str(detail)

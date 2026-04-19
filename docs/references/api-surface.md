@@ -21,11 +21,6 @@ Shared failure and discovery behavior:
 - `fail(message)`
 - `expect(condition, ...details)`
 
-`expect(...)` formatting:
-
-- no details -> `Expectation failed`
-- details -> `Expectation failed: ` plus `str(...)`-joined detail list
-
 ## `GodoteerTest`
 
 File: `sample_project/addons/godoteer/test.gd`
@@ -61,29 +56,19 @@ Scene-only helpers:
 - `expect_node(path_or_node, message = "")`
 - `expect_property(path_or_node, property_name, expected, message = "")`
 
-Test shape:
+Diagnostics:
 
-- `func test_*(driver: GodoteerDriver) -> void`
+- scene failures auto-capture screenshot when active screen exists and screenshot capture is available
 
 ## `GodoteerDriver`
 
 File: `sample_project/addons/godoteer/driver.gd`
-
-Role:
-
-- Session-level scene object for scene suites only
-- Opens and closes scene-backed `GodoteerScreen` instances
 
 Methods:
 
 - `await screen(scene_ref)`
 - `await close_screen()`
 - `await reset()`
-
-Accepted scene refs:
-
-- `PackedScene`
-- `res://...` path string
 
 ## `GodoteerScreen`
 
@@ -95,36 +80,34 @@ Timing:
 - `await wait_seconds(seconds)`
 - `await wait_until(predicate, timeout_sec = 2.0, step_frames = 1, message = "Condition timed out")`
 
-Raw access:
+Actions:
+
+- `await click(target, button = MOUSE_BUTTON_LEFT)`
+- `await fill(target, text)`
+- `await clear(target)`
+- `await press(target, keycode)`
+- `await check(target)`
+- `await uncheck(target)`
+- `await select_option(target, option_text)`
+
+Node helpers:
 
 - `node(path_or_node)`
 - `node_exists(path_or_node)`
 - `property(path_or_node, property_name)`
 - `node_text(path_or_node)`
+- `node_value(path_or_node)`
+- `is_visible(path_or_node)`
+- `is_enabled(path_or_node)`
 - `locator(target)`
 - `within(target)`
 
-Input and artifacts:
+Artifacts:
 
-- `await click(target, button = MOUSE_BUTTON_LEFT)`
-- `mouse_move(position)`
-- `await move_mouse_between(from_position, to_position, duration_sec = 0.2, steps = 12)`
-- `await move_mouse_to(to_position, duration_sec = 0.2, steps = 12)`
-- `mouse_button(position, button = MOUSE_BUTTON_LEFT, pressed = true)`
-- `await key_tap(keycode)`
 - `screenshot(file_name = "screenshot.png")`
 - `can_screenshot()`
 
-Accessibility helpers:
-
-- `screen_reader_supported()`
-- `screen_reader_active()`
-- `accessible_name(target)`
-- `accessible_description(target)`
-- `expect_accessible_name(target, expected, message = "")`
-- `expect_accessible_description(target, expected, message = "")`
-
-Accessibility-first queries:
+Queries:
 
 - `get/query/find/get_all/query_all/find_all_by_role(...)`
 - `get/query/find_by_text(...)`
@@ -132,7 +115,7 @@ Accessibility-first queries:
 - `get/query/find_by_placeholder_text(...)`
 - `get/query_by_node_name(...)`
 
-Query semantics:
+Semantics:
 
 - `get_*`: fail on zero or multiple, no waiting
 - `query_*`: `null` on zero, fail on multiple, no waiting
@@ -142,26 +125,38 @@ Query semantics:
 
 File: `sample_project/addons/godoteer/locator.gd`
 
-Locator methods:
+Actions:
+
+- `await click()`
+- `await fill(text)`
+- `await clear()`
+- `await press(keycode)`
+- `await check()`
+- `await uncheck()`
+- `await select_option(option_text)`
+
+Reads:
 
 - `node()`
 - `exists()`
-- `await click()`
-- `property(property_name)`
 - `text()`
-- `expect_exists(message = "")`
-- `expect_text(expected, message = "")`
-- `await wait_for(timeout_sec = 2.0, step_frames = 1, message = "")`
-- `await wait_for_text(expected, timeout_sec = 2.0, step_frames = 1, message = "")`
-- `within()`
+- `value()`
+- `property(property_name)`
 
-Scoped query helpers:
+Waited assertions:
 
-- `get/query/find/get_all/query_all/find_all_by_role(...)`
-- `get/query/find_by_text(...)`
-- `get/query/find_by_label_text(...)`
-- `get/query/find_by_placeholder_text(...)`
-- `get/query_by_node_name(...)`
+- `await to_exist(timeout_sec = 2.0)`
+- `await to_have_text(expected, timeout_sec = 2.0)`
+- `await to_have_value(expected, timeout_sec = 2.0)`
+- `await to_be_visible(timeout_sec = 2.0)`
+- `await to_be_enabled(timeout_sec = 2.0)`
+
+Current instant helpers still available:
+
+- `expect_exists()`
+- `expect_text()`
+- `wait_for()`
+- `wait_for_text()`
 
 ## `runner.gd`
 
@@ -169,13 +164,15 @@ File: `sample_project/addons/godoteer/runner.gd`
 
 Args:
 
-- `--test <res://...>` required
+- `--test <res://...>` for one file
+- `--dir <res://...>` for recursive directory run
 - `--artifacts <path>`
 
 Behavior:
 
-- Loads suite script and enforces `GodoteerTest` or `GodoteerSceneTest` inheritance
-- Discovers `test_*` methods in sorted order
-- Unit suites run with zero-arg tests and no driver allocation
-- Scene suites create one `GodoteerDriver` and pass it to each test
-- Exits `0` on pass, `1` on failure/load error, `2` on usage error
+- rejects `--test` and `--dir` together
+- discovers `.gd` suites recursively for `--dir`
+- runs suite paths in sorted order
+- runs `test_*` methods in sorted order
+- supports mixed unit and scene suites in same directory tree
+- prints grouped failure summary by suite path and test name

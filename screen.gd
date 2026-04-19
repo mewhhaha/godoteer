@@ -74,6 +74,44 @@ func node_text(path_or_node: Variant) -> String:
 	return _visible_text(node(path_or_node))
 
 
+func node_value(path_or_node: Variant):
+	var target := node(path_or_node)
+	if target == null:
+		return null
+
+	if target is LineEdit or target is TextEdit:
+		return target.text
+	if target is CheckBox or target is CheckButton:
+		return target.button_pressed
+	if target is OptionButton:
+		if target.selected >= 0:
+			return target.get_item_text(target.selected)
+		return null
+	if _has_property(target, "value"):
+		return target.get("value")
+	if _has_property(target, "text"):
+		return target.get("text")
+	return null
+
+
+func is_visible(path_or_node: Variant) -> bool:
+	var target := node(path_or_node)
+	if target == null:
+		return false
+	if target is CanvasItem:
+		return target.is_visible_in_tree()
+	return true
+
+
+func is_enabled(path_or_node: Variant) -> bool:
+	var target := node(path_or_node)
+	if target == null:
+		return false
+	if target is Control:
+		return not target.disabled
+	return true
+
+
 func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	var target_node := node(target)
 	if target_node is BaseButton:
@@ -93,6 +131,68 @@ func click(target: Variant, button: int = MOUSE_BUTTON_LEFT) -> void:
 	await wait_frames(1)
 	mouse_button(position, button, false)
 	await wait_frames(1)
+
+
+func fill(target: Variant, text: String) -> void:
+	var target_node := node(target)
+	if target_node is LineEdit:
+		target_node.grab_focus()
+		target_node.text = text
+		target_node.text_changed.emit(text)
+		await wait_frames(1)
+		return
+
+	_record_failure("fill() supports LineEdit only right now: %s" % str(target))
+
+
+func clear(target: Variant) -> void:
+	await fill(target, "")
+
+
+func press(target: Variant, keycode: Key) -> void:
+	var target_node := node(target)
+	if target_node is Control:
+		target_node.grab_focus()
+	await key_tap(keycode)
+
+
+func check(target: Variant) -> void:
+	var target_node := node(target)
+	if target_node is CheckBox or target_node is CheckButton:
+		if not target_node.button_pressed:
+			target_node.button_pressed = true
+			target_node.toggled.emit(true)
+		await wait_frames(1)
+		return
+
+	_record_failure("check() supports CheckBox and CheckButton only: %s" % str(target))
+
+
+func uncheck(target: Variant) -> void:
+	var target_node := node(target)
+	if target_node is CheckBox or target_node is CheckButton:
+		if target_node.button_pressed:
+			target_node.button_pressed = false
+			target_node.toggled.emit(false)
+		await wait_frames(1)
+		return
+
+	_record_failure("uncheck() supports CheckBox and CheckButton only: %s" % str(target))
+
+
+func select_option(target: Variant, option_text: String) -> void:
+	var target_node := node(target)
+	if target_node is OptionButton:
+		for index in range(target_node.item_count):
+			if target_node.get_item_text(index) == option_text:
+				target_node.select(index)
+				target_node.item_selected.emit(index)
+				await wait_frames(1)
+				return
+		_record_failure("Option not found for select_option(): %s on %s" % [option_text, str(target)])
+		return
+
+	_record_failure("select_option() supports OptionButton only: %s" % str(target))
 
 
 func mouse_move(position: Vector2) -> void:
@@ -332,6 +432,13 @@ func expect_text(path_or_node: Variant, expected: String, message: String = "") 
 
 func record_failure(message: String) -> void:
 	_record_failure(message)
+
+
+func _has_property(target: Object, property_name: String) -> bool:
+	for property_info in target.get_property_list():
+		if str(property_info.get("name", "")) == property_name:
+			return true
+	return false
 
 
 func _resolve_position(target: Variant) -> Variant:
