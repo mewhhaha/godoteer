@@ -45,6 +45,38 @@ func test_accessibility_first_queries(driver: GodoteerDriver) -> void:
 	screen.screen_reader_active()
 
 
+func test_exact_text_and_accessibility_preserve_edge_whitespace(driver: GodoteerDriver) -> void:
+	var screen := await driver.screen(SAMPLE_APP)
+	var form := screen.within(screen.get_by_node_name("FormPanel"))
+	drain_failures()
+	var whitespace_text := form.get_by_text("  Exact Trim\n")
+	var whitespace_button := form.get_by_role("button", {"name": "  Space Name  "})
+
+	await whitespace_text.to_have_text("  Exact Trim\n")
+	await whitespace_button.to_have_accessible_name("  Space Name  ")
+	await whitespace_button.to_have_accessible_description("  Space Desc\n")
+	screen.expect_accessible_name(whitespace_button, "  Space Name  ")
+	screen.expect_accessible_description(whitespace_button, "  Space Desc\n")
+
+	set_failures_quiet(true)
+	var trimmed_text := form.get_by_text("Exact Trim")
+	screen.expect_accessible_name(whitespace_button, "Space Name")
+	screen.expect_accessible_description(whitespace_button, "Space Desc")
+	set_failures_quiet(false)
+	var failures := drain_failures()
+
+	expect(trimmed_text == null, "Exact text query should fail for trimmed text")
+	expect(failures.size() == 3, "Trimmed exact text and accessibility checks should record three failures", failures)
+	expect(str(failures[0]).contains("get_by_text"), "Trimmed exact text failure should mention get_by_text", failures)
+	expect(str(failures[1]).contains("Accessible name mismatch"), "Trimmed exact name failure should mention accessible name mismatch", failures)
+	expect(str(failures[2]).contains("Accessible description mismatch"), "Trimmed exact description failure should mention accessible description mismatch", failures)
+
+	var fuzzy_text := form.get_by_text("Exact Trim", {"exact": false})
+	expect(fuzzy_text != null, "Non-exact text query should still match whitespace-padded text")
+	if fuzzy_text != null:
+		await fuzzy_text.to_have_text("  Exact Trim\n")
+
+
 func test_click_updates_visible_text_with_find(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
 	var form := screen.within(screen.get_by_node_name("FormPanel"))
@@ -93,7 +125,7 @@ func test_checkbox_and_clear_actions(driver: GodoteerDriver) -> void:
 	await status.to_have_text("Notes: Journal")
 	await notes_field.clear()
 	await notes_field.to_have_value("")
-	await status.to_have_text("Notes:")
+	await status.to_have_text("Notes: ")
 	await terms_toggle.click()
 	await terms_toggle.to_have_value(true)
 	await terms_toggle.check()
@@ -123,6 +155,7 @@ func test_drag_and_negative_assertions(driver: GodoteerDriver) -> void:
 
 func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
+	drain_failures()
 	var missing := screen.query_by_text("Nope")
 
 	expect(missing == null, "query_by_text should return null on zero matches")
@@ -131,6 +164,7 @@ func test_query_returns_null_for_zero_matches(driver: GodoteerDriver) -> void:
 
 func test_get_records_failure_for_zero_matches(driver: GodoteerDriver) -> void:
 	var screen := await driver.screen(SAMPLE_APP)
+	drain_failures()
 	set_failures_quiet(true)
 	var missing := screen.get_by_text("Nope")
 	set_failures_quiet(false)

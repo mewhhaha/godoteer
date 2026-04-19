@@ -1028,7 +1028,7 @@ func _get_string_property(target: Object, property_name: String) -> String:
 			continue
 
 		var value = target.get(property_name)
-		return str(value).strip_edges() if value is String else ""
+		return str(value) if value is String else ""
 
 	return ""
 

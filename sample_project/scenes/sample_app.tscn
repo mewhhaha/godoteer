@@ -23,6 +23,10 @@ layout_mode = 2
 text = "Idle"
 accessibility_description = "Current sample status"
 
+[node name="WhitespaceLabel" type="Label" parent="FormPanel"]
+layout_mode = 2
+text = "  Exact Trim\n"
+
 [node name="NameRow" type="HBoxContainer" parent="FormPanel"]
 layout_mode = 2
 
@@ -105,3 +109,9 @@ layout_mode = 2
 text = "Start"
 accessibility_name = "Start"
 accessibility_description = "Starts sample flow"
+
+[node name="WhitespaceButton" type="Button" parent="FormPanel"]
+layout_mode = 2
+text = "Whitespace Action"
+accessibility_name = "  Space Name  "
+accessibility_description = "  Space Desc\n"

@@ -3,6 +3,7 @@ extends SceneTree
 const EXIT_OK := 0
 const EXIT_FAIL := 1
 const EXIT_USAGE := 2
+const RUNNER_FAILURE_SUITE := "<runner>"
 const GodoteerDriver = preload("driver.gd")
 const GodoteerTest = preload("test.gd")
 const GodoteerSceneTest = preload("test_scene.gd")
@@ -51,8 +52,8 @@ func _boot() -> void:
 		had_failures = true
 		run_stats["failure_messages"] += 1
 		var no_match_message := "No tests matched --grep: %s" % str(config["grep"])
-		_record_suite_failure("<runner>", "<load>", no_match_message)
-		_append_junit_load_failure("<runner>", "runner", no_match_message, 0)
+		_record_suite_failure(RUNNER_FAILURE_SUITE, "<load>", no_match_message)
+		_append_junit_load_failure(RUNNER_FAILURE_SUITE, "runner", no_match_message, 0)
 
 	var junit_path := ""
 	if str(config["junit"]) != "":
@@ -61,7 +62,7 @@ func _boot() -> void:
 			had_failures = true
 
 	if had_failures:
-		run_stats["suites_failed"] = suite_failures.size()
+		run_stats["suites_failed"] = _failed_executed_suite_count()
 		printerr("GodoteerGD FAIL %s" % _run_summary())
 		if junit_path != "":
 			printerr("GodoteerGD JUnit %s" % junit_path)
@@ -446,7 +447,7 @@ func _write_junit_report(report_path: String) -> String:
 	var dir_error := DirAccess.make_dir_recursive_absolute(absolute_dir)
 	if dir_error != OK:
 		run_stats["failure_messages"] += 1
-		_record_suite_failure("<runner>", "<load>", "Could not create JUnit dir: %s" % absolute_dir)
+		_record_suite_failure(RUNNER_FAILURE_SUITE, "<load>", "Could not create JUnit dir: %s" % absolute_dir)
 		return ""
 
 	var lines: PackedStringArray = []
@@ -476,7 +477,7 @@ func _write_junit_report(report_path: String) -> String:
 	var file := FileAccess.open(absolute_path, FileAccess.WRITE)
 	if file == null:
 		run_stats["failure_messages"] += 1
-		_record_suite_failure("<runner>", "<load>", "Could not open JUnit report for writing: %s" % report_path)
+		_record_suite_failure(RUNNER_FAILURE_SUITE, "<load>", "Could not open JUnit report for writing: %s" % report_path)
 		return ""
 
 	file.store_string("\n".join(lines) + "\n")
@@ -502,6 +503,15 @@ func _junit_failure_count_for_cases(testcases: Array) -> int:
 	var total := 0
 	for testcase in testcases:
 		total += testcase.get("failures", []).size()
+	return total
+
+
+func _failed_executed_suite_count() -> int:
+	var total := 0
+	for suite_path in suite_failures.keys():
+		if str(suite_path) == RUNNER_FAILURE_SUITE:
+			continue
+		total += 1
 	return total
 
 
