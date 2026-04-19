@@ -56,6 +56,7 @@
 ## Click Model
 
 - `click()`, `hover()`, `focus()`, `blur()`, and `drag_to()` prefer input/focus-system routing for `Control` targets.
+- `dblclick()`, `right_click()`, and `long_press()` reuse same pointer routing, with direct `gui_input` fallback when generic controls do not see parsed mouse events.
 - Semantic actions still honor disabled controls and do not force activation.
 - `fill()` and `press()` also refuse non-editable text inputs.
 - Headless Godot may skip some GUI dispatch paths, so Godoteer keeps limited internal fallback to preserve deterministic smoke coverage.
@@ -66,6 +67,10 @@
 
 - `wait_until_frames()` and `wait_until_physics()` use frame budgets, not wall-clock seconds.
 - `next_signal()` can capture signal payload args and poll on process or physics frames.
+- `expect_signal()`, `expect_no_signal()`, and `expect_signal_count()` use short-lived signal probes, not persistent spy objects.
+- `hold_action_until()` and `hold_key_until()` always release held input on success and timeout.
+- `wait_for_animation_finished()`, `wait_for_audio_finished()`, `wait_for_body_entered()`, and `wait_for_area_entered()` are focused helpers over specific Godot signals, not generic scene introspection.
+- `wait_for_audio_finished()` prefers `finished`, but can fall back to ended playback state when backend timing skips signal delivery.
 - `pause_scene()` relies on `SceneTree.paused`; nodes configured to keep processing while paused may still run.
 - `set_time_scale()` changes engine-global `Engine.time_scale` during active scene tests.
 - Driver reset restores `SceneTree.paused = false` and `Engine.time_scale = 1.0`.

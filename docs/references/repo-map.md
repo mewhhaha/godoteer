@@ -68,6 +68,12 @@ Branch model:
   - proves `wait_physics_frames` and `wait_for_signal`
   - proves unknown action and signal-timeout failures
 
+- `sample_project/tests/scene/gameplay_events_test.gd`
+  - proves `hold_action_until`, `hold_key_until`, and `key_chord`
+  - proves `dblclick`, `right_click`, and `long_press`
+  - proves `expect_signal`, `expect_no_signal`, and `expect_signal_count`
+  - proves waits for animation, collision overlaps, and audio completion
+
 - `sample_project/tests/scene/simulation_test.gd`
   - proves deterministic frame-budget waits and `next_signal(...)` payload capture
   - proves `pause_scene`, `resume_scene`, `set_time_scale`, and reset cleanup
@@ -81,6 +87,9 @@ Branch model:
 
 - `sample_project/scenes/gameplay_input_probe.tscn`
   - fixture scene for InputMap-driven gameplay movement and jump signal
+
+- `sample_project/scenes/gameplay_events_probe.tscn`
+  - fixture scene for held input, key chords, pointer variants, signal bursts, animation, audio, and overlap waits
 
 - `sample_project/scenes/simulation_probe.tscn`
   - fixture scene for process/physics counters, delta sums, and signal payload timing

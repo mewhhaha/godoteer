@@ -30,6 +30,22 @@ func click() -> void:
 	await screen.click(target)
 
 
+func dblclick(button: int = MOUSE_BUTTON_LEFT) -> void:
+	var target := _node_or_fail("dblclick")
+	if target == null:
+		return
+
+	await screen.dblclick(target, button)
+
+
+func right_click() -> void:
+	var target := _node_or_fail("right_click")
+	if target == null:
+		return
+
+	await screen.right_click(target)
+
+
 func hover() -> void:
 	var target := _node_or_fail("hover")
 	if target == null:
@@ -52,6 +68,14 @@ func blur() -> void:
 		return
 
 	await screen.blur(target)
+
+
+func long_press(hold_frames := 12, button := MOUSE_BUTTON_LEFT) -> void:
+	var target := _node_or_fail("long_press")
+	if target == null:
+		return
+
+	await screen.long_press(target, hold_frames, button)
 
 
 func fill(text: String) -> void:

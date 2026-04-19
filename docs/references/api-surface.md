@@ -84,7 +84,14 @@ Timing:
 - `await wait_until_physics(predicate, max_frames = 120, message = "Condition timed out")`
 - `await wait_until(predicate, timeout_sec = 2.0, step_frames = 1, message = "Condition timed out")`
 - `await next_signal(target, signal_name, max_frames = 120, physics = false, message = "")`
+- `await expect_signal(target, signal_name, max_frames = 120, physics = false, message = "")`
+- `await expect_no_signal(target, signal_name, max_frames = 120, physics = false, message = "")`
+- `await expect_signal_count(target, signal_name, expected_count, max_frames = 120, physics = false, message = "")`
 - `await wait_for_signal(target, signal_name, timeout_sec = 2.0, message = "")`
+- `await wait_for_animation_finished(player_target, animation_name = "", max_frames = 120, message = "")`
+- `await wait_for_audio_finished(player_target, max_frames = 120, message = "")`
+- `await wait_for_body_entered(area_target, max_frames = 120, message = "")`
+- `await wait_for_area_entered(area_target, max_frames = 120, message = "")`
 - `pause_scene()`
 - `resume_scene()`
 - `set_time_scale(scale)`
@@ -94,12 +101,15 @@ Gameplay actions:
 - `action_press(action_name, strength = 1.0)`
 - `action_release(action_name)`
 - `await action_tap(action_name, hold_frames = 1, strength = 1.0)`
+- `await hold_action_until(action_name, predicate, max_frames = 120, strength = 1.0, message = "")`
 
 Raw input:
 
 - `key_press(keycode)`
 - `key_release(keycode)`
 - `await key_tap(keycode, hold_frames = 1)`
+- `await hold_key_until(keycode, predicate, max_frames = 120, message = "")`
+- `await key_chord(keycodes, hold_frames = 1)`
 - `joy_button_press(button, device = 0)`
 - `joy_button_release(button, device = 0)`
 - `await joy_button_tap(button, hold_frames = 1, device = 0)`
@@ -117,11 +127,14 @@ Raw input:
 Actions:
 
 - `await click(target, button = MOUSE_BUTTON_LEFT)`
+- `await dblclick(target, button = MOUSE_BUTTON_LEFT)`
+- `await right_click(target)`
 - `await hover(target)`
 - `await focus(target)`
 - `await blur(target)`
 - `await fill(target, text)`
 - `await clear(target)`
+- `await long_press(target, hold_frames = 12, button = MOUSE_BUTTON_LEFT)`
 - `await drag_to(source, target_or_position, duration_sec = 0.2, steps = 12)`
 - `await press(target, keycode)`
 - `await check(target)`
@@ -233,11 +246,14 @@ File: `sample_project/addons/godoteer/locator.gd`
 Actions:
 
 - `await click()`
+- `await dblclick(button = MOUSE_BUTTON_LEFT)`
+- `await right_click()`
 - `await hover()`
 - `await focus()`
 - `await blur()`
 - `await fill(text)`
 - `await clear()`
+- `await long_press(hold_frames = 12, button = MOUSE_BUTTON_LEFT)`
 - `await drag_to(target_or_position, duration_sec = 0.2, steps = 12)`
 - `await press(keycode)`
 - `await check()`
