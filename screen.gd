@@ -153,6 +153,7 @@ func focus(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is Control:
 		target_node.grab_focus()
+		target_node.focus_entered.emit()
 		await wait_frames(1)
 		return
 
@@ -163,6 +164,7 @@ func blur(target: Variant) -> void:
 	var target_node := node(target)
 	if target_node is Control:
 		target_node.release_focus()
+		target_node.focus_exited.emit()
 		await wait_frames(1)
 		return
 
@@ -349,25 +351,76 @@ func screenshot(file_name: String = "screenshot.png") -> String:
 		_record_failure("Screenshots unavailable with current renderer/window mode")
 		return ""
 
-	var save_path := artifacts_dir.path_join(file_name)
-	var absolute_path := ProjectSettings.globalize_path(save_path)
-	var absolute_dir := absolute_path.get_base_dir()
-	var dir_error := DirAccess.make_dir_recursive_absolute(absolute_dir)
-	if dir_error != OK:
-		_record_failure("Could not create screenshot dir: %s" % absolute_dir)
+	var image := _viewport_image()
+	if image == null:
+		_record_failure("Could not read viewport image for screenshot")
 		return ""
 
-	var image := tree.root.get_viewport().get_texture().get_image()
-	var save_error := image.save_png(absolute_path)
-	if save_error != OK:
-		_record_failure("Could not save screenshot: %s" % save_path)
-		return ""
-
-	return absolute_path
+	return _save_png_image(image, file_name)
 
 
 func capture_locator(target: Variant, file_name: String = "locator.png") -> String:
-	return screenshot(file_name)
+	if not can_screenshot():
+		_record_failure("Screenshots unavailable with current renderer/window mode")
+		return ""
+
+	var target_node := node(target)
+	if not target_node is Control:
+		_record_failure("capture_locator() supports Control only: %s" % str(target))
+		return ""
+
+	var control: Control = target_node
+	if not control.is_visible_in_tree():
+		_record_failure("capture_locator() target is not visible: %s" % str(target))
+		return ""
+
+	var image := _viewport_image()
+	if image == null:
+		_record_failure("Could not read viewport image for locator capture")
+		return ""
+
+	var crop_rect := _locator_capture_rect(control, Vector2i(image.get_width(), image.get_height()))
+	if crop_rect.size.x <= 0 or crop_rect.size.y <= 0:
+		_record_failure("capture_locator() invalid crop rect for %s: %s" % [str(target), str(crop_rect)])
+		return ""
+
+	var cropped := image.get_region(crop_rect)
+	if cropped == null or cropped.is_empty():
+		_record_failure("capture_locator() failed to crop image for %s" % str(target))
+		return ""
+
+	return _save_png_image(cropped, file_name)
+
+
+func capture_camera(camera_target: Variant, file_name: String = "camera.png") -> String:
+	if DisplayServer.get_name() == "headless":
+		_record_failure("Camera screenshots unavailable with current renderer/window mode")
+		return ""
+
+	var camera_node := node(camera_target)
+	if not (camera_node is Camera2D or camera_node is Camera3D):
+		_record_failure("capture_camera() supports Camera2D and Camera3D only: %s" % str(camera_target))
+		return ""
+
+	var viewport := camera_node.get_viewport()
+	if viewport == null or viewport.get_texture() == null:
+		_record_failure("capture_camera() could not resolve viewport texture for %s" % str(camera_target))
+		return ""
+
+	var previous_camera: Variant = _active_camera_for_viewport(viewport, camera_node)
+	if previous_camera != camera_node:
+		camera_node.make_current()
+		await wait_frames(2)
+
+	var image := _viewport_image_from(viewport)
+	if image == null:
+		_restore_camera(previous_camera, camera_node)
+		_record_failure("Could not read viewport image for camera capture")
+		return ""
+
+	var save_path := _save_png_image(image, file_name)
+	_restore_camera(previous_camera, camera_node)
+	return save_path
 
 
 func can_screenshot() -> bool:
@@ -749,6 +802,9 @@ func _accessible_name(candidate: Node) -> String:
 	if _supports_text_accessible_name(candidate):
 		return _visible_text(candidate)
 
+	if _is_labelable_control(candidate):
+		return _associated_label_text(candidate)
+
 	return ""
 
 
@@ -782,6 +838,21 @@ func _placeholder_text(candidate: Node) -> String:
 
 
 func _associated_label_text(candidate: Node) -> String:
+	var sibling_label := _previous_label_sibling_text(candidate)
+	if sibling_label != "":
+		return sibling_label
+
+	var parent := candidate.get_parent()
+	while parent != null and parent != app_root.get_parent():
+		var container_label := _unambiguous_container_label_text(parent, candidate)
+		if container_label != "":
+			return container_label
+		parent = parent.get_parent()
+
+	return ""
+
+
+func _previous_label_sibling_text(candidate: Node) -> String:
 	var parent := candidate.get_parent()
 	if parent == null:
 		return ""
@@ -793,7 +864,7 @@ func _associated_label_text(candidate: Node) -> String:
 
 	for sibling_index in range(index - 1, -1, -1):
 		var sibling = siblings[sibling_index]
-		if sibling is Label:
+		if sibling is Label and _is_query_visible(sibling):
 			var text := _visible_text(sibling)
 			if text != "":
 				return text
@@ -801,6 +872,44 @@ func _associated_label_text(candidate: Node) -> String:
 			break
 
 	return ""
+
+
+func _unambiguous_container_label_text(container: Node, candidate: Node) -> String:
+	var labels := _collect_visible_labels(container)
+	if labels.size() != 1:
+		return ""
+
+	var controls := _collect_labelable_controls(container)
+	if controls.size() != 1 or controls[0] != candidate:
+		return ""
+
+	return labels[0]
+
+
+func _collect_visible_labels(root: Node) -> Array[String]:
+	var labels: Array[String] = []
+	for child in root.get_children():
+		if child is Label and _is_query_visible(child):
+			var text := _visible_text(child)
+			if text != "":
+				labels.append(text)
+				continue
+
+		labels.append_array(_collect_visible_labels(child))
+
+	return labels
+
+
+func _collect_labelable_controls(root: Node) -> Array:
+	var controls: Array = []
+	for child in root.get_children():
+		if child is Control and _is_labelable_control(child) and _is_query_visible(child):
+			controls.append(child)
+			continue
+
+		controls.append_array(_collect_labelable_controls(child))
+
+	return controls
 
 
 func _supports_text_accessible_name(candidate: Node) -> bool:
@@ -817,6 +926,88 @@ func _is_textbox(candidate: Node) -> bool:
 
 func _is_hidden(candidate: Node) -> bool:
 	return candidate is CanvasItem and not candidate.is_visible_in_tree()
+
+
+func _is_query_visible(candidate: Node) -> bool:
+	return not _is_hidden(candidate)
+
+
+func _viewport_image() -> Image:
+	return _viewport_image_from(tree.root.get_viewport())
+
+
+func _viewport_image_from(viewport: Viewport) -> Image:
+	if viewport == null:
+		return null
+
+	var texture := viewport.get_texture()
+	if texture == null:
+		return null
+
+	return texture.get_image()
+
+
+func _save_png_image(image: Image, file_name: String) -> String:
+	var save_path := artifacts_dir.path_join(file_name)
+	var absolute_path := ProjectSettings.globalize_path(save_path)
+	var absolute_dir := absolute_path.get_base_dir()
+	var dir_error := DirAccess.make_dir_recursive_absolute(absolute_dir)
+	if dir_error != OK:
+		_record_failure("Could not create screenshot dir: %s" % absolute_dir)
+		return ""
+
+	var save_error := image.save_png(absolute_path)
+	if save_error != OK:
+		_record_failure("Could not save screenshot: %s" % save_path)
+		return ""
+
+	return absolute_path
+
+
+func _locator_capture_rect(control: Control, image_size: Vector2i) -> Rect2i:
+	var visible_rect := control.get_global_rect()
+	var ancestor := control.get_parent()
+	while ancestor != null:
+		if ancestor is Control and ancestor.clip_contents:
+			visible_rect = visible_rect.intersection(ancestor.get_global_rect())
+			if visible_rect.size.x <= 0.0 or visible_rect.size.y <= 0.0:
+				return Rect2i()
+		ancestor = ancestor.get_parent()
+
+	var viewport_rect := Rect2(Vector2.ZERO, Vector2(image_size))
+	var clamped_rect := visible_rect.intersection(viewport_rect)
+	if clamped_rect.size.x <= 0.0 or clamped_rect.size.y <= 0.0:
+		return Rect2i()
+
+	var position := Vector2i(
+		int(floor(clamped_rect.position.x)),
+		int(floor(clamped_rect.position.y))
+	)
+	var end_position := Vector2i(
+		int(ceil(clamped_rect.end.x)),
+		int(ceil(clamped_rect.end.y))
+	)
+	return Rect2i(position, end_position - position)
+
+
+func _active_camera_for_viewport(viewport: Viewport, camera_node: Node):
+	if camera_node is Camera2D:
+		return viewport.get_camera_2d()
+	if camera_node is Camera3D:
+		return viewport.get_camera_3d()
+	return null
+
+
+func _restore_camera(previous_camera, target_camera) -> void:
+	if previous_camera != null and previous_camera != target_camera:
+		previous_camera.make_current()
+		return
+
+	if previous_camera == null:
+		if _has_property(target_camera, "enabled"):
+			target_camera.set("enabled", false)
+		if _has_property(target_camera, "current"):
+			target_camera.set("current", false)
 
 
 func _get_string_property(target: Object, property_name: String) -> String:

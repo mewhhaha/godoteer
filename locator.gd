@@ -202,6 +202,16 @@ func to_have_value(expected, timeout_sec: float = 2.0) -> bool:
 	)
 
 
+func not_to_have_value(expected, timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return value() != expected,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for value on %s to differ from %s actual=%s" % [description, var_to_str(expected), var_to_str(value())]
+	)
+
+
 func to_be_visible(timeout_sec: float = 2.0) -> bool:
 	return await _wait_for_condition(
 		func() -> bool:
@@ -249,6 +259,36 @@ func to_be_checked(timeout_sec: float = 2.0) -> bool:
 		timeout_sec,
 		func() -> String:
 			return "Timed out waiting for %s to become checked actual=%s" % [description, var_to_str(value())]
+	)
+
+
+func to_be_unchecked(timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return value() == false,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for %s to become unchecked actual=%s" % [description, var_to_str(value())]
+	)
+
+
+func to_have_accessible_name(expected: String, timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return screen.accessible_name(self) == expected,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for accessible name on %s expected=%s actual=%s" % [description, expected, screen.accessible_name(self)]
+	)
+
+
+func to_have_accessible_description(expected: String, timeout_sec: float = 2.0) -> bool:
+	return await _wait_for_condition(
+		func() -> bool:
+			return screen.accessible_description(self) == expected,
+		timeout_sec,
+		func() -> String:
+			return "Timed out waiting for accessible description on %s expected=%s actual=%s" % [description, expected, screen.accessible_description(self)]
 	)
 
 

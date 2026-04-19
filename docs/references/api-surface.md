@@ -111,6 +111,7 @@ Artifacts:
 
 - `screenshot(file_name = "screenshot.png")`
 - `capture_locator(target, file_name = "locator.png")`
+- `await capture_camera(camera_target, file_name = "camera.png")`
 - `can_screenshot()`
 
 Current support matrix:
@@ -119,7 +120,8 @@ Current support matrix:
 - `check` / `uncheck` / `set_checked`: `CheckBox`, `CheckButton`
 - `select_option`: `OptionButton`
 - `focus` / `blur`: `Control`
-- `capture_locator`: full-screen capture only for now, no cropping
+- `capture_locator`: cropped PNG for visible `Control` targets only
+- `capture_camera`: `Camera2D`, `Camera3D`
 
 Queries:
 
@@ -170,11 +172,15 @@ Waited assertions:
 - `await to_have_text(expected, timeout_sec = 2.0)`
 - `await not_to_have_text(expected, timeout_sec = 2.0)`
 - `await to_have_value(expected, timeout_sec = 2.0)`
+- `await not_to_have_value(expected, timeout_sec = 2.0)`
 - `await to_be_visible(timeout_sec = 2.0)`
 - `await to_be_hidden(timeout_sec = 2.0)`
 - `await to_be_enabled(timeout_sec = 2.0)`
 - `await to_be_disabled(timeout_sec = 2.0)`
 - `await to_be_checked(timeout_sec = 2.0)`
+- `await to_be_unchecked(timeout_sec = 2.0)`
+- `await to_have_accessible_name(expected, timeout_sec = 2.0)`
+- `await to_have_accessible_description(expected, timeout_sec = 2.0)`
 
 Current instant helpers still available:
 
@@ -192,6 +198,8 @@ Args:
 - `--test <res://...>` for one file
 - `--dir <res://...>` for recursive directory run
 - `--artifacts <path>`
+- `--grep <text>` for case-insensitive suite/test filtering
+- `--junit <path>` for JUnit XML output
 
 Behavior:
 
@@ -199,5 +207,8 @@ Behavior:
 - discovers `.gd` suites recursively for `--dir`
 - runs suite paths in sorted order
 - runs `test_*` methods in sorted order
+- filters by suite path or test name when `--grep` is set
+- fails with clear runner error when `--grep` matches nothing
 - supports mixed unit and scene suites in same directory tree
 - prints grouped failure summary by suite path and test name
+- writes JUnit XML on pass and fail when `--junit` is set

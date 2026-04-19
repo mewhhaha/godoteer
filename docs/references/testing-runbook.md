@@ -18,6 +18,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/smoke_test.gd
 ```
 
+Filtered run with JUnit output:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --dir res://tests --grep drag --junit user://artifacts/junit/results.xml
+```
+
 Headless whole test tree:
 
 ```bash
@@ -58,7 +65,9 @@ python3 /home/mewhhaha/.codex/skills/.system/skill-creator/scripts/quick_validat
 
 - Default artifact target: `user://artifacts`
 - scene failure screenshots save under `user://artifacts/failures/` when windowed capture is available
-- manual `locator.capture(...)` currently saves full-screen screenshots; no crop assertion yet
+- manual `locator.capture(...)` saves cropped PNGs for visible `Control` targets
+- `screen.capture_camera(...)` saves full camera viewport PNGs for `Camera2D` / `Camera3D`
+- JUnit output writes wherever `--junit` points, including `user://...`
 
 ## Headless vs Windowed
 
