@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GodoteerLocator
 
+const GodoteerLocatorList = preload("locator_list.gd")
+
 var screen: Object
 var query: Dictionary
 var description := "locator"
@@ -21,45 +23,40 @@ func exists() -> bool:
 
 
 func click() -> void:
-	var target := node()
+	var target := _node_or_fail("click")
 	if target == null:
-		screen.record_failure("Locator not found for click: %s" % description)
 		return
 
 	await screen.click(target)
 
 
 func hover() -> void:
-	var target := node()
+	var target := _node_or_fail("hover")
 	if target == null:
-		screen.record_failure("Locator not found for hover: %s" % description)
 		return
 
 	await screen.hover(target)
 
 
 func focus() -> void:
-	var target := node()
+	var target := _node_or_fail("focus")
 	if target == null:
-		screen.record_failure("Locator not found for focus: %s" % description)
 		return
 
 	await screen.focus(target)
 
 
 func blur() -> void:
-	var target := node()
+	var target := _node_or_fail("blur")
 	if target == null:
-		screen.record_failure("Locator not found for blur: %s" % description)
 		return
 
 	await screen.blur(target)
 
 
 func fill(text: String) -> void:
-	var target := node()
+	var target := _node_or_fail("fill")
 	if target == null:
-		screen.record_failure("Locator not found for fill: %s" % description)
 		return
 
 	await screen.fill(target, text)
@@ -70,66 +67,67 @@ func clear() -> void:
 
 
 func press(keycode: Key) -> void:
-	var target := node()
+	var target := _node_or_fail("press")
 	if target == null:
-		screen.record_failure("Locator not found for press: %s" % description)
 		return
 
 	await screen.press(target, keycode)
 
 
 func drag_to(target_or_position: Variant, duration_sec: float = 0.2, steps: int = 12) -> void:
-	var target := node()
+	var target := _node_or_fail("drag_to")
 	if target == null:
-		screen.record_failure("Locator not found for drag_to: %s" % description)
 		return
 
 	await screen.drag_to(target, target_or_position, duration_sec, steps)
 
 
 func check() -> void:
-	var target := node()
+	var target := _node_or_fail("check")
 	if target == null:
-		screen.record_failure("Locator not found for check: %s" % description)
 		return
 
 	await screen.check(target)
 
 
 func uncheck() -> void:
-	var target := node()
+	var target := _node_or_fail("uncheck")
 	if target == null:
-		screen.record_failure("Locator not found for uncheck: %s" % description)
 		return
 
 	await screen.uncheck(target)
 
 
 func set_checked(checked: bool) -> void:
-	var target := node()
+	var target := _node_or_fail("set_checked")
 	if target == null:
-		screen.record_failure("Locator not found for set_checked: %s" % description)
 		return
 
 	await screen.set_checked(target, checked)
 
 
 func select_option(option_text: String) -> void:
-	var target := node()
+	var target := _node_or_fail("select_option")
 	if target == null:
-		screen.record_failure("Locator not found for select_option: %s" % description)
 		return
 
 	await screen.select_option(target, option_text)
 
 
 func capture(file_name: String = "locator.png") -> String:
-	var target := node()
+	var target := _node_or_fail("capture")
 	if target == null:
-		screen.record_failure("Locator not found for capture: %s" % description)
 		return ""
 
 	return screen.capture_locator(target, file_name)
+
+
+func expect_snapshot(file_name: String, options: Dictionary = {}) -> bool:
+	var target := _node_or_fail("expect_snapshot")
+	if target == null:
+		return false
+
+	return screen.expect_locator_snapshot(target, file_name, options)
 
 
 func property(property_name: String):
@@ -145,7 +143,9 @@ func value():
 
 
 func expect_exists(message: String = "") -> void:
-	screen.expect_node(self, message if message != "" else "Expected locator to exist: %s" % description)
+	if node() != null:
+		return
+	screen.record_failure(message if message != "" else screen.describe_missing_query(query, "", description))
 
 
 func expect_text(expected: String, message: String = "") -> void:
@@ -322,15 +322,15 @@ func find_by_role(role: String, options: Dictionary = {}) -> GodoteerLocator:
 	return await screen.find_by_role(role, options, self)
 
 
-func get_all_by_role(role: String, options: Dictionary = {}) -> Array:
+func get_all_by_role(role: String, options: Dictionary = {}) -> GodoteerLocatorList:
 	return screen.get_all_by_role(role, options, self)
 
 
-func query_all_by_role(role: String, options: Dictionary = {}) -> Array:
+func query_all_by_role(role: String, options: Dictionary = {}) -> GodoteerLocatorList:
 	return screen.query_all_by_role(role, options, self)
 
 
-func find_all_by_role(role: String, options: Dictionary = {}) -> Array:
+func find_all_by_role(role: String, options: Dictionary = {}) -> GodoteerLocatorList:
 	return await screen.find_all_by_role(role, options, self)
 
 
@@ -346,6 +346,18 @@ func find_by_text(text: String, options: Dictionary = {}) -> GodoteerLocator:
 	return await screen.find_by_text(text, options, self)
 
 
+func get_all_by_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.get_all_by_text(text, options, self)
+
+
+func query_all_by_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.query_all_by_text(text, options, self)
+
+
+func find_all_by_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return await screen.find_all_by_text(text, options, self)
+
+
 func get_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLocator:
 	return screen.get_by_label_text(text, options, self)
 
@@ -356,6 +368,18 @@ func query_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLoca
 
 func find_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLocator:
 	return await screen.find_by_label_text(text, options, self)
+
+
+func get_all_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.get_all_by_label_text(text, options, self)
+
+
+func query_all_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.query_all_by_label_text(text, options, self)
+
+
+func find_all_by_label_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return await screen.find_all_by_label_text(text, options, self)
 
 
 func get_by_placeholder_text(text: String, options: Dictionary = {}) -> GodoteerLocator:
@@ -370,12 +394,36 @@ func find_by_placeholder_text(text: String, options: Dictionary = {}) -> Godotee
 	return await screen.find_by_placeholder_text(text, options, self)
 
 
+func get_all_by_placeholder_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.get_all_by_placeholder_text(text, options, self)
+
+
+func query_all_by_placeholder_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return screen.query_all_by_placeholder_text(text, options, self)
+
+
+func find_all_by_placeholder_text(text: String, options: Dictionary = {}) -> GodoteerLocatorList:
+	return await screen.find_all_by_placeholder_text(text, options, self)
+
+
 func get_by_node_name(name: String) -> GodoteerLocator:
 	return screen.get_by_node_name(name, self)
 
 
 func query_by_node_name(name: String) -> GodoteerLocator:
 	return screen.query_by_node_name(name, self)
+
+
+func get_all_by_node_name(name: String) -> GodoteerLocatorList:
+	return screen.get_all_by_node_name(name, self)
+
+
+func query_all_by_node_name(name: String) -> GodoteerLocatorList:
+	return screen.query_all_by_node_name(name, self)
+
+
+func find_all_by_node_name(name: String) -> GodoteerLocatorList:
+	return await screen.find_all_by_node_name(name, self)
 
 
 func wait_for(timeout_sec: float = 2.0, step_frames: int = 1, message: String = "") -> bool:
@@ -407,3 +455,10 @@ func _wait_for_condition(predicate: Callable, timeout_sec: float, message_builde
 
 	screen.record_failure(message_builder.call())
 	return false
+
+
+func _node_or_fail(action_name: String) -> Node:
+	var target := node()
+	if target == null:
+		screen.record_failure(screen.describe_missing_query(query, action_name, description))
+	return target

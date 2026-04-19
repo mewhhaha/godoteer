@@ -53,6 +53,13 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --dir res://tests --grep drag --junit user://artifacts/junit/results.xml
 ```
 
+Update visual baselines intentionally:
+
+```bash
+godot --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://tests/scene/visual_snapshot_test.gd --update-snapshots
+```
+
 Headless whole test tree:
 
 ```bash
@@ -100,8 +107,11 @@ python3 /home/mewhhaha/.codex/skills/.system/skill-creator/scripts/quick_validat
 
 - Default artifact target: `user://artifacts`
 - scene failure screenshots save under `user://artifacts/failures/` when windowed capture is available
+- scene failure traces save under `user://artifacts/traces/<suite>/<test>/`
 - manual `locator.capture(...)` saves cropped PNGs for visible `Control` targets
 - `screen.capture_camera(...)` saves full camera viewport PNGs for `Camera2D` / `Camera3D`
+- visual mismatch artifacts save under `user://artifacts/visual_failures/`
+- repo baselines live under `res://tests/__snapshots__/`
 - JUnit output writes wherever `--junit` points, including `user://...`
 
 ## Headless vs Windowed

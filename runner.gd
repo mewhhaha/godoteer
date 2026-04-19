@@ -108,7 +108,13 @@ func _run_suite(suite_path: String, config: Dictionary) -> bool:
 		return true
 
 	if is_scene_test:
-		driver = GodoteerDriver.new(self, test_case, config["artifacts"])
+		driver = GodoteerDriver.new(
+			self,
+			test_case,
+			config["artifacts"],
+			suite_path,
+			bool(config["update_snapshots"])
+		)
 		test_case.set_meta("godoteer_driver", driver)
 
 	var all_test_methods: PackedStringArray = test_case.list_tests()
@@ -162,6 +168,7 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 		"artifacts": "user://artifacts",
 		"grep": "",
 		"junit": "",
+		"update_snapshots": false,
 	}
 
 	var index := 0
@@ -193,6 +200,8 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 				if index >= args.size():
 					return {"error": "Missing value after --junit"}
 				config["junit"] = args[index]
+			"--update-snapshots":
+				config["update_snapshots"] = true
 			"--help", "-h":
 				return {"error": _usage_text()}
 			_:
@@ -209,7 +218,7 @@ func _parse_args(args: PackedStringArray) -> Dictionary:
 
 
 func _usage_text() -> String:
-	return "Usage: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --test res://tests/scene/smoke_test.gd [--grep text] [--junit user://artifacts/results.xml]\n   or: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --dir res://tests [--grep text] [--junit user://artifacts/results.xml]"
+	return "Usage: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --test res://tests/scene/smoke_test.gd [--grep text] [--junit user://artifacts/results.xml] [--update-snapshots]\n   or: godot --headless --path sample_project -s addons/godoteer/runner.gd -- --dir res://tests [--grep text] [--junit user://artifacts/results.xml] [--update-snapshots]"
 
 
 func _fatal(message: String, code: int) -> void:
@@ -269,6 +278,7 @@ func _run_scene_test_case(test_case: GodoteerSceneTest, driver: GodoteerDriver, 
 	for test_name in test_methods:
 		var test_started_at_msec: int = Time.get_ticks_msec()
 		var failure_count_before := test_case.failure_count()
+		driver.set_active_test(test_name)
 		await test_case.before_each(driver, test_name)
 		var test_callable := Callable(test_case, test_name)
 		await test_callable.callv([driver])
