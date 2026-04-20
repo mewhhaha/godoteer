@@ -62,6 +62,8 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --dir res://tests
 ```
 
+`--dir` discovers only scripts that extend `res://addons/godoteer/test.gd` or `test_scene.gd` and define `test_*`. Helper base scripts and ordinary app scripts are skipped.
+
 Run scene smoke windowed for screenshot coverage:
 
 ```bash
