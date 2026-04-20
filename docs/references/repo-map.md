@@ -40,6 +40,8 @@ Branch model:
   - live collection wrapper for multi-match queries
 - `runner.gd`
   - single-file or directory execution
+- `runtime_error_collector.gd`
+  - per-test Godot log tailer for `ERROR:` and `SCRIPT ERROR:` capture
 
 ## Sample Coverage
 
@@ -102,6 +104,8 @@ Branch model:
 
 - `sample_project/trace_probes/trace_bundle_probe_test.gd`
   - dedicated pass/fail scene suite for failure trace bundle verification outside main green test tree
+- `sample_project/runner_probes/runtime_error_probe_test.gd`
+  - dedicated failing unit suite for runner runtime-error capture verification
 
 - `sample_project/tests/__snapshots__/`
   - checked-in visual snapshot baselines keyed by suite path, test name, and logical file name

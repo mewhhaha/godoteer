@@ -64,6 +64,8 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
 
 `--dir` discovers only scripts that extend `res://addons/godoteer/test.gd` or `test_scene.gd` and define `test_*`. Helper base scripts and ordinary app scripts are skipped.
 
+Runner also tails Godot runtime log per test when file logging is available. New `ERROR:` and `SCRIPT ERROR:` blocks become normal failures, so `push_error(...)` and engine/runtime errors show in summary and JUnit output.
+
 Run scene smoke windowed for screenshot coverage:
 
 ```bash
@@ -90,6 +92,13 @@ Run deterministic simulation scene test headless:
 ```bash
 godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --test res://tests/scene/simulation_test.gd
+```
+
+Run runtime-error probe:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://runner_probes/runtime_error_probe_test.gd
 ```
 
 Minimal unit suite:
