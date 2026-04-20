@@ -81,6 +81,8 @@
 - Good for multi-assert diagnostics.
 - Bad for fail-fast expectations unless test drains or inspects failures intentionally.
 - Unit and scene suites share same failure collector.
+- Runner also converts new `ERROR:` and `SCRIPT ERROR:` blocks from Godot runtime log into test failures.
+- This is per-test log tailing, not debugger-hook inspection. It depends on Godot file logging under `user://logs/`.
 - Scene suites write failure trace bundles only when a test fails.
 - Trace bundles are lightweight JSONL/text artifacts, not replayable traces.
 

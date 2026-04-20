@@ -5,6 +5,7 @@ const EXIT_FAIL := 1
 const EXIT_USAGE := 2
 const RUNNER_FAILURE_SUITE := "<runner>"
 const GodoteerDriver = preload("driver.gd")
+const GodoteerRuntimeErrorCollector = preload("runtime_error_collector.gd")
 const GodoteerTest = preload("test.gd")
 const GodoteerSceneTest = preload("test_scene.gd")
 
@@ -19,6 +20,7 @@ var run_stats := {
 var run_started_at_msec := 0
 var junit_suites: Array = []
 var matched_test_count := 0
+var runtime_error_collector: GodoteerRuntimeErrorCollector
 
 
 func _initialize() -> void:
@@ -27,6 +29,7 @@ func _initialize() -> void:
 
 func _boot() -> void:
 	run_started_at_msec = Time.get_ticks_msec()
+	runtime_error_collector = GodoteerRuntimeErrorCollector.new()
 	var config := _parse_args(OS.get_cmdline_user_args())
 	if config.has("error"):
 		_fatal(config["error"], EXIT_USAGE)
@@ -266,10 +269,13 @@ func _run_unit_test_case(test_case: GodoteerTest, suite_path: String, test_metho
 	for test_name in test_methods:
 		var test_started_at_msec: int = Time.get_ticks_msec()
 		var failure_count_before := test_case.failure_count()
+		runtime_error_collector.begin_test()
 		await test_case.before_each(test_name)
 		var test_callable := Callable(test_case, test_name)
 		await test_callable.callv([])
 		await test_case.after_each(test_name)
+		await process_frame
+		_append_runtime_errors(test_case, runtime_error_collector.end_test())
 		var new_failures: Array[String] = _capture_new_failures(test_case, suite_path, test_name, failure_count_before)
 		var duration_msec: int = Time.get_ticks_msec() - test_started_at_msec
 		_append_junit_testcase(suite_record, test_name, duration_msec, new_failures)
@@ -280,11 +286,14 @@ func _run_scene_test_case(test_case: GodoteerSceneTest, driver: GodoteerDriver, 
 	for test_name in test_methods:
 		var test_started_at_msec: int = Time.get_ticks_msec()
 		var failure_count_before := test_case.failure_count()
+		runtime_error_collector.begin_test()
 		driver.set_active_test(test_name)
 		await test_case.before_each(driver, test_name)
 		var test_callable := Callable(test_case, test_name)
 		await test_callable.callv([driver])
 		await test_case.after_each(driver, test_name)
+		await process_frame
+		_append_runtime_errors(test_case, runtime_error_collector.end_test())
 		var new_failures: Array[String] = _capture_new_failures(test_case, suite_path, test_name, failure_count_before)
 		var duration_msec: int = Time.get_ticks_msec() - test_started_at_msec
 		_append_junit_testcase(suite_record, test_name, duration_msec, new_failures)
@@ -329,7 +338,7 @@ func _print_grouped_failures() -> void:
 		for test_name in test_names:
 			printerr("  %s" % test_name)
 			for message in suite_entry[test_name]:
-				printerr("    %s" % str(message))
+				_print_indented_block("    ", str(message))
 
 
 func _print_test_result(test_name: String, failed: bool, failure_count: int, duration_msec: int) -> void:
@@ -383,6 +392,21 @@ func _format_duration(duration_msec: int) -> String:
 	if duration_msec < 1000:
 		return "%dms" % duration_msec
 	return "%.2fs" % (float(duration_msec) / 1000.0)
+
+
+func _append_runtime_errors(test_case: Object, runtime_errors: Array[String]) -> void:
+	for error_block in runtime_errors:
+		test_case.record_failure("Runtime error detected:\n%s" % error_block)
+
+
+func _print_indented_block(prefix: String, text: String) -> void:
+	var lines := str(text).split("\n", true)
+	if lines.is_empty():
+		printerr(prefix)
+		return
+
+	for line in lines:
+		printerr("%s%s" % [prefix, line])
 
 
 func _count_runnable_suites(suite_paths: PackedStringArray, grep_text: String) -> int:

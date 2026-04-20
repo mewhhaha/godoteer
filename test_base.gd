@@ -19,7 +19,7 @@ func list_tests() -> PackedStringArray:
 func record_failure(message: String) -> void:
 	failures.append(message)
 	if not quiet_failures:
-		printerr("FAIL: %s" % message)
+		_print_failure_message(message)
 
 
 func has_failures() -> bool:
@@ -74,3 +74,14 @@ func _format_detail(detail: Variant) -> String:
 	if detail is Array or detail is Dictionary:
 		return var_to_str(detail)
 	return str(detail)
+
+
+func _print_failure_message(message: String) -> void:
+	var lines := str(message).split("\n", true)
+	if lines.is_empty():
+		printerr("FAIL:")
+		return
+
+	printerr("FAIL: %s" % lines[0])
+	for line_index in range(1, lines.size()):
+		printerr("      %s" % lines[line_index])

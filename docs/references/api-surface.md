@@ -20,6 +20,7 @@ Shared failure and discovery behavior:
 - `set_failures_quiet(enabled)`
 - `fail(message)`
 - `expect(condition, ...details)`
+- multiline failure output keeps line breaks
 
 ## `GodoteerTest`
 
@@ -60,6 +61,7 @@ Diagnostics:
 
 - scene failures auto-capture screenshot when active screen exists and screenshot capture is available
 - scene failures also write `trace.jsonl` and `summary.txt` under `user://artifacts/traces/...`
+- runtime-error failures captured after scene test still flow through same failure and trace path
 
 ## `GodoteerDriver`
 
@@ -70,6 +72,16 @@ Methods:
 - `await screen(scene_ref)`
 - `await close_screen()`
 - `await reset()`
+
+## `runner.gd`
+
+File: `sample_project/addons/godoteer/runner.gd`
+
+Diagnostics:
+
+- per-test runtime log tailing from `user://logs/godot.log` when available
+- new `ERROR:` and `SCRIPT ERROR:` blocks become normal test failures
+- same failures flow into grouped output and JUnit
 
 ## `GodoteerScreen`
 

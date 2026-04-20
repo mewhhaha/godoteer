@@ -83,6 +83,15 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
 
 Directory discovery only includes scripts that extend Godoteer test bases and define `test_*`. Helper base scripts and ordinary app scripts are skipped.
 
+Runtime-error probe:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --test res://runner_probes/runtime_error_probe_test.gd
+```
+
+Runner tails `user://logs/godot.log` per test when available. New `ERROR:` and `SCRIPT ERROR:` blocks become normal failures and show in grouped output plus JUnit.
+
 Windowed scene smoke:
 
 ```bash
