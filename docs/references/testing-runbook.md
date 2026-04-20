@@ -74,6 +74,15 @@ godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
   --dir res://tests
 ```
 
+Mixed directory discovery:
+
+```bash
+godot --headless --path sample_project -s addons/godoteer/runner.gd -- \
+  --dir res://scripts --grep mixed_dir
+```
+
+Directory discovery only includes scripts that extend Godoteer test bases and define `test_*`. Helper base scripts and ordinary app scripts are skipped.
+
 Windowed scene smoke:
 
 ```bash

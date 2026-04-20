@@ -78,15 +78,25 @@ func _boot() -> void:
 
 func _run_suite(suite_path: String, config: Dictionary) -> bool:
 	var suite_started_at_msec: int = Time.get_ticks_msec()
-	var script: Script = load(suite_path)
-	if script == null:
-		var load_message := "Could not load test: %s" % suite_path
+	var inspection := _inspect_suite_script(suite_path)
+	if not bool(inspection.get("loaded", false)):
+		var load_message := str(inspection.get("load_error", "Could not load test: %s" % suite_path))
 		run_stats["failure_messages"] += 1
 		_record_suite_failure(suite_path, "<load>", load_message)
 		_append_junit_load_failure(suite_path, "load", load_message, Time.get_ticks_msec() - suite_started_at_msec)
 		_print_suite_result(suite_path, "<load>", true, 0, Time.get_ticks_msec() - suite_started_at_msec)
 		return true
 
+	var suite_kind := str(inspection.get("kind", ""))
+	if suite_kind == "":
+		var extends_message := "Test must extend res://addons/godoteer/test.gd or res://addons/godoteer/test_scene.gd: %s" % suite_path
+		run_stats["failure_messages"] += 1
+		_record_suite_failure(suite_path, "<load>", extends_message)
+		_append_junit_load_failure(suite_path, "load", extends_message, Time.get_ticks_msec() - suite_started_at_msec)
+		_print_suite_result(suite_path, "<load>", true, 0, Time.get_ticks_msec() - suite_started_at_msec)
+		return true
+
+	var script: Script = inspection.get("script", null)
 	var test_case = script.new()
 	if test_case == null:
 		var instantiate_message := "Could not instantiate test: %s" % suite_path
@@ -97,16 +107,7 @@ func _run_suite(suite_path: String, config: Dictionary) -> bool:
 		return true
 
 	var driver: GodoteerDriver = null
-	var is_scene_test := test_case is GodoteerSceneTest
-	var is_unit_test := test_case is GodoteerTest
-	if not is_scene_test and not is_unit_test:
-		var extends_message := "Test must extend res://addons/godoteer/test.gd or res://addons/godoteer/test_scene.gd: %s" % suite_path
-		run_stats["failure_messages"] += 1
-		_record_suite_failure(suite_path, "<load>", extends_message)
-		_append_junit_load_failure(suite_path, "load", extends_message, Time.get_ticks_msec() - suite_started_at_msec)
-		_print_suite_result(suite_path, "<load>", true, 0, Time.get_ticks_msec() - suite_started_at_msec)
-		return true
-
+	var is_scene_test := suite_kind == "scene"
 	if is_scene_test:
 		driver = GodoteerDriver.new(
 			self,
@@ -117,13 +118,13 @@ func _run_suite(suite_path: String, config: Dictionary) -> bool:
 		)
 		test_case.set_meta("godoteer_driver", driver)
 
-	var all_test_methods: PackedStringArray = test_case.list_tests()
+	var all_test_methods: PackedStringArray = inspection.get("test_methods", PackedStringArray())
 	if all_test_methods.is_empty():
 		var no_tests_message := "No test methods found. Define methods named test_* in %s" % suite_path
 		run_stats["failure_messages"] += 1
 		_record_suite_failure(suite_path, "<load>", no_tests_message)
-		_append_junit_load_failure(suite_path, "scene" if is_scene_test else "unit", no_tests_message, Time.get_ticks_msec() - suite_started_at_msec)
-		_print_suite_result(suite_path, "scene" if is_scene_test else "unit", true, 0, Time.get_ticks_msec() - suite_started_at_msec)
+		_append_junit_load_failure(suite_path, suite_kind, no_tests_message, Time.get_ticks_msec() - suite_started_at_msec)
+		_print_suite_result(suite_path, suite_kind, true, 0, Time.get_ticks_msec() - suite_started_at_msec)
 		if is_scene_test:
 			test_case.remove_meta("godoteer_driver")
 		return true
@@ -135,7 +136,6 @@ func _run_suite(suite_path: String, config: Dictionary) -> bool:
 		return false
 
 	matched_test_count += test_methods.size()
-	var suite_kind := "scene" if is_scene_test else "unit"
 	var suite_record := {
 		"name": suite_path,
 		"kind": suite_kind,
@@ -256,7 +256,9 @@ func _walk_suite_dir(absolute_dir: String, res_dir: String, suite_paths: PackedS
 		if dir.current_is_dir():
 			_walk_suite_dir(absolute_path, res_path, suite_paths)
 		elif entry.ends_with(".gd"):
-			suite_paths.append(res_path)
+			var inspection := _inspect_suite_script(res_path)
+			if bool(inspection.get("loaded", false)) and str(inspection.get("kind", "")) != "" and bool(inspection.get("has_tests", false)):
+				suite_paths.append(res_path)
 	dir.list_dir_end()
 
 
@@ -395,24 +397,81 @@ func _count_runnable_suites(suite_paths: PackedStringArray, grep_text: String) -
 
 
 func _is_runnable_suite(suite_path: String, grep_text: String) -> bool:
-	var script: Script = load(suite_path)
-	if script == null:
+	var inspection := _inspect_suite_script(suite_path)
+	if not bool(inspection.get("loaded", false)):
 		return true
 
-	var test_case = script.new()
-	if test_case == null:
-		return true
+	if str(inspection.get("kind", "")) == "":
+		return false
 
-	var is_scene_test := test_case is GodoteerSceneTest
-	var is_unit_test := test_case is GodoteerTest
-	if not is_scene_test and not is_unit_test:
-		return true
-
-	var all_test_methods: PackedStringArray = test_case.list_tests()
+	var all_test_methods: PackedStringArray = inspection.get("test_methods", PackedStringArray())
 	if all_test_methods.is_empty():
-		return true
+		return false
 
 	return not _filter_test_methods(all_test_methods, suite_path, grep_text).is_empty()
+
+
+func _inspect_suite_script(suite_path: String) -> Dictionary:
+	var script: Script = load(suite_path)
+	if script == null:
+		return {
+			"loaded": false,
+			"script": null,
+			"kind": "",
+			"has_tests": false,
+			"test_methods": PackedStringArray(),
+			"load_error": "Could not load test: %s" % suite_path,
+		}
+
+	var test_methods := _script_test_methods(script)
+	return {
+		"loaded": true,
+		"script": script,
+		"kind": _suite_kind_for_script(script),
+		"has_tests": not test_methods.is_empty(),
+		"test_methods": test_methods,
+		"load_error": "",
+	}
+
+
+func _suite_kind_for_script(script: Script) -> String:
+	var current: Script = script
+	while current != null:
+		if _script_matches(current, GodoteerSceneTest):
+			return "scene"
+		if _script_matches(current, GodoteerTest):
+			return "unit"
+		current = current.get_base_script()
+	return ""
+
+
+func _script_matches(candidate: Script, expected: Script) -> bool:
+	if candidate == null or expected == null:
+		return false
+	if candidate == expected:
+		return true
+	return str(candidate.resource_path) == str(expected.resource_path)
+
+
+func _script_test_methods(script: Script) -> PackedStringArray:
+	var names: PackedStringArray = []
+	var seen := {}
+	var current: Script = script
+	while current != null:
+		var method_list: Array = []
+		if current.has_method("get_script_method_list"):
+			method_list = current.call("get_script_method_list")
+		else:
+			method_list = current.get_method_list()
+
+		for method_info in method_list:
+			var method_name := str(method_info.get("name", ""))
+			if method_name.begins_with("test_") and not seen.has(method_name):
+				names.append(method_name)
+				seen[method_name] = true
+		current = current.get_base_script()
+	names.sort()
+	return names
 
 
 func _filter_test_methods(test_methods: PackedStringArray, suite_path: String, grep_text: String) -> PackedStringArray:
